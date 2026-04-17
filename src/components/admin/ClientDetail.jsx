@@ -2,23 +2,17 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../../context/DataContext'
 import { format, parseISO } from 'date-fns'
-import {
-  ArrowLeft, AlertTriangle, Building2, User, Phone, Mail,
-  Calendar, FileText, MessageSquare, Link2, ChevronRight,
-} from 'lucide-react'
+import { ArrowLeft, AlertTriangle, FileText, Plus, ChevronDown, ChevronUp } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
 import RenewalCountdown from '../common/RenewalCountdown'
-import Card, { CardHeader, CardBody } from '../common/Card'
+import Card, { HeroCard, GlassPill } from '../common/Card'
 import Modal from '../common/Modal'
 import BrokerTracker from './BrokerTracker'
 import ReportWriter from './ReportWriter'
 import AdminMessages from './AdminMessages'
 import {
-  WAGE_BILL_LABELS,
-  STAFF_CHANGE_LABELS,
-  CONTRACT_LABELS,
-  INCIDENT_LABELS,
-  formatTurnover,
+  WAGE_BILL_LABELS, STAFF_CHANGE_LABELS, CONTRACT_LABELS,
+  INCIDENT_LABELS, formatTurnover,
 } from '../../utils/flagging'
 
 const TABS = ['Overview', 'Check-ins', 'Reports', 'Broker Log', 'Messages']
@@ -26,482 +20,294 @@ const TABS = ['Overview', 'Check-ins', 'Reports', 'Broker Log', 'Messages']
 export default function ClientDetail() {
   const { clientId } = useParams()
   const navigate = useNavigate()
-  const { getClient, getCheckIns, getReports, updateClient } = useData()
+  const { getClient, getCheckIns, getReports } = useData()
 
-  const [activeTab, setActiveTab] = useState('Overview')
+  const [tab, setTab] = useState('Overview')
   const [showReportWriter, setShowReportWriter] = useState(false)
   const [editingReport, setEditingReport] = useState(null)
 
   const client = getClient(clientId)
-  if (!client) {
-    return (
-      <div className="text-center py-16 text-gray-400">
-        Client not found.{' '}
-        <button onClick={() => navigate('/admin/clients')} className="text-gold hover:underline">
-          Back to clients
-        </button>
-      </div>
-    )
-  }
+  if (!client) return (
+    <div className="text-center py-16 text-slate-400 text-sm">
+      Client not found.{' '}
+      <button onClick={() => navigate('/admin/clients')} className="text-[#2447F9] underline">Back</button>
+    </div>
+  )
 
   const checkIns = getCheckIns(clientId)
   const reports = getReports(clientId)
 
+  const statusGrad = {
+    'file-current': 'bg-card-hero',
+    'flag-raised': 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]',
+    'action-required': 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]',
+  }[client.status] || 'bg-card-hero'
+
   return (
-    <div className="space-y-6">
-      {/* Back + header */}
-      <div>
+    <div className="space-y-4">
+      {/* Back */}
+      <button
+        onClick={() => navigate('/admin/clients')}
+        className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+      >
+        <ArrowLeft size={14} /> All clients
+      </button>
+
+      {/* Hero */}
+      <div className={`rounded-[30px] ${statusGrad} p-5 text-white shadow-hero`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <GlassPill>{client.sector}</GlassPill>
+            <h1 className="mt-2 text-2xl font-bold leading-tight">{client.businessName}</h1>
+            <p className="text-sm text-white/80 mt-1">Broker: {client.brokerName} · {client.brokerCompany}</p>
+          </div>
+          <StatusBadge status={client.status} className="!bg-white/20 !text-white flex-shrink-0" />
+        </div>
+
+        <div className="flex gap-2 mt-4 flex-wrap">
+          <GlassPill>
+            <RenewalCountdown renewalDate={client.renewalDate} compact className="text-white" />
+          </GlassPill>
+          <GlassPill>{client.contactEmail}</GlassPill>
+        </div>
+
+        {client.notes && (
+          <div className="mt-3 text-sm text-white/80 bg-white/10 rounded-2xl p-3">
+            {client.notes}
+          </div>
+        )}
+
         <button
-          onClick={() => navigate('/admin/clients')}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-navy dark:hover:text-white transition-colors mb-4"
+          onClick={() => { setEditingReport(null); setShowReportWriter(true) }}
+          className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-bold text-slate-900 flex items-center gap-2 transition-transform active:scale-[0.98]"
         >
-          <ArrowLeft size={14} />
-          All clients
+          <FileText size={14} /> New Report
         </button>
-
-        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-semibold text-navy dark:text-white tracking-tight">
-                {client.businessName}
-              </h1>
-              <StatusBadge status={client.status} />
-            </div>
-            <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
-              {client.sector} · {client.contactName}
-            </p>
-          </div>
-
-          <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => { setEditingReport(null); setShowReportWriter(true) }}
-              className="flex items-center gap-2 px-4 py-2 bg-gold text-navy font-medium text-sm rounded-lg hover:bg-gold-300 transition-colors"
-            >
-              <FileText size={14} />
-              New Report
-            </button>
-          </div>
-        </div>
       </div>
-
-      {/* Quick info bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <InfoChip icon={<Building2 size={13} />} label="Sector" value={client.sector} />
-        <InfoChip
-          icon={<Link2 size={13} />}
-          label="Broker"
-          value={`${client.brokerName} (${client.brokerCompany})`}
-        />
-        <InfoChip
-          icon={<Calendar size={13} />}
-          label="Renewal"
-          value={format(parseISO(client.renewalDate), 'd MMM yyyy')}
-          extra={<RenewalCountdown renewalDate={client.renewalDate} />}
-        />
-        <InfoChip
-          icon={<Mail size={13} />}
-          label="Email"
-          value={client.contactEmail}
-        />
-      </div>
-
-      {/* Notes */}
-      {client.notes && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 flex gap-3">
-          <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-700 dark:text-amber-300">{client.notes}</p>
-        </div>
-      )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-white/10">
-        <nav className="flex gap-0 -mb-px overflow-x-auto">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeTab === tab
-                  ? 'border-gold text-navy dark:text-white'
-                  : 'border-transparent text-gray-400 hover:text-navy dark:hover:text-white'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold flex-shrink-0 transition-all ${
+              tab === t
+                ? 'bg-btn-primary text-white shadow-btn'
+                : 'bg-white text-slate-600 shadow-card dark:bg-[#101a2e] dark:text-white/60'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'Overview' && (
-        <OverviewTab client={client} checkIns={checkIns} reports={reports} />
+      {tab === 'Overview'   && <OverviewTab client={client} checkIns={checkIns} reports={reports} />}
+      {tab === 'Check-ins'  && <CheckInsTab checkIns={checkIns} />}
+      {tab === 'Reports'    && (
+        <ReportsTab reports={reports} onNew={() => { setEditingReport(null); setShowReportWriter(true) }}
+          onEdit={r => { setEditingReport(r); setShowReportWriter(true) }} />
       )}
-      {activeTab === 'Check-ins' && (
-        <CheckInsTab checkIns={checkIns} />
-      )}
-      {activeTab === 'Reports' && (
-        <ReportsTab
-          reports={reports}
-          client={client}
-          onNew={() => { setEditingReport(null); setShowReportWriter(true) }}
-          onEdit={(r) => { setEditingReport(r); setShowReportWriter(true) }}
-        />
-      )}
-      {activeTab === 'Broker Log' && (
-        <BrokerTracker clientId={clientId} client={client} />
-      )}
-      {activeTab === 'Messages' && (
-        <AdminMessages clientId={clientId} client={client} />
-      )}
+      {tab === 'Broker Log' && <BrokerTracker clientId={clientId} client={client} />}
+      {tab === 'Messages'   && <AdminMessages clientId={clientId} client={client} />}
 
-      {/* Report writer modal */}
-      <Modal
-        open={showReportWriter}
-        onClose={() => { setShowReportWriter(false); setEditingReport(null) }}
-        title={editingReport ? 'Edit Governance Report' : 'New Governance Report'}
-        size="xl"
-      >
-        <ReportWriter
-          client={client}
-          checkIns={checkIns}
-          existingReport={editingReport}
-          onClose={() => { setShowReportWriter(false); setEditingReport(null) }}
-        />
+      <Modal open={showReportWriter} onClose={() => { setShowReportWriter(false); setEditingReport(null) }}
+        title={editingReport ? 'Edit Report' : 'New Governance Report'} size="xl">
+        <ReportWriter client={client} checkIns={checkIns} existingReport={editingReport}
+          onClose={() => { setShowReportWriter(false); setEditingReport(null) }} />
       </Modal>
     </div>
   )
 }
 
-// ---- Sub-components ----
-
-function InfoChip({ icon, label, value, extra }) {
-  return (
-    <div className="bg-white dark:bg-navy-50 rounded-xl border border-gray-100 dark:border-white/10 px-4 py-3">
-      <div className="flex items-center gap-1.5 text-gray-400 dark:text-white/30 mb-1">
-        {icon}
-        <span className="text-xs uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-sm font-medium text-navy dark:text-white truncate">{value}</p>
-      {extra && <div className="mt-1">{extra}</div>}
-    </div>
-  )
-}
-
 function OverviewTab({ client, checkIns, reports }) {
-  const lastThree = [...checkIns].reverse().slice(0, 3)
+  const recent = [...checkIns].sort((a,b)=>b.month.localeCompare(a.month)).slice(0,3)
   const latestReport = reports[0]
 
   return (
-    <div className="grid lg:grid-cols-2 gap-6">
-      {/* Recent check-ins summary */}
+    <div className="space-y-3">
       <Card>
-        <CardHeader>
-          <h3 className="font-semibold text-navy dark:text-white text-sm">Recent Check-ins</h3>
-        </CardHeader>
-        <CardBody className="!p-0">
-          {lastThree.length === 0 ? (
-            <p className="text-sm text-gray-400 px-6 py-8 text-center">No check-ins yet</p>
+        <div className="p-4">
+          <h3 className="font-bold text-slate-900 dark:text-white mb-3">Recent Check-ins</h3>
+          {recent.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">No check-ins yet</p>
           ) : (
-            <div className="divide-y divide-gray-50 dark:divide-white/5">
-              {lastThree.map((ci) => (
-                <div key={ci.id} className="px-6 py-4">
+            <div className="space-y-3">
+              {recent.map(ci => (
+                <div key={ci.id} className="rounded-[20px] bg-slate-50 dark:bg-white/5 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-navy dark:text-white">{ci.month}</span>
-                    {ci.flags?.length > 0 ? (
-                      <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                        <AlertTriangle size={11} />
-                        {ci.flags.length} flag{ci.flags.length > 1 ? 's' : ''}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Clear</span>
-                    )}
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm">{ci.month}</span>
+                    {ci.flags?.length > 0
+                      ? <span className="text-xs text-amber-600 font-semibold flex items-center gap-1"><AlertTriangle size={11}/>{ci.flags.length} flag{ci.flags.length>1?'s':''}</span>
+                      : <span className="text-xs text-emerald-600 font-semibold">Clear</span>
+                    }
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <MiniStat label="Turnover" value={formatTurnover(ci.data.estimatedTurnover)} />
-                    <MiniStat label="Wage bill" value={WAGE_BILL_LABELS[ci.data.wageBillChange]} />
-                    <MiniStat label="Contracts" value={CONTRACT_LABELS[ci.data.newContracts]} />
-                    <MiniStat label="Incidents" value={INCIDENT_LABELS[ci.data.incidents]} />
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <span className="text-slate-500">Turnover: <strong className="text-slate-800 dark:text-white">{formatTurnover(ci.data.estimatedTurnover)}</strong></span>
+                    <span className="text-slate-500">Wage: <strong className="text-slate-800 dark:text-white">{WAGE_BILL_LABELS[ci.data.wageBillChange]}</strong></span>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </CardBody>
+        </div>
       </Card>
 
-      {/* Latest report */}
-      <Card>
-        <CardHeader>
-          <h3 className="font-semibold text-navy dark:text-white text-sm">Latest Report</h3>
-        </CardHeader>
-        <CardBody>
-          {!latestReport ? (
-            <p className="text-sm text-gray-400 py-4 text-center">No reports generated yet</p>
-          ) : (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <StatusBadge status={latestReport.status} />
-                <span className="text-xs text-gray-400 dark:text-white/40">{latestReport.period}</span>
-              </div>
-              <h4 className="text-sm font-semibold text-navy dark:text-white mb-2">{latestReport.title}</h4>
-              {latestReport.content?.executiveSummary && (
-                <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed line-clamp-4">
-                  {latestReport.content.executiveSummary}
-                </p>
-              )}
-              <div className="mt-3 pt-3 border-t border-gray-50 dark:border-white/5">
-                <p className="text-xs text-gray-400 dark:text-white/30">
-                  Created {format(parseISO(latestReport.createdAt), 'd MMM yyyy')}
-                  {latestReport.publishedAt && ` · Published ${format(parseISO(latestReport.publishedAt), 'd MMM yyyy')}`}
-                </p>
-              </div>
+      {latestReport && (
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-slate-900 dark:text-white">Latest Report</h3>
+              <StatusBadge status={latestReport.status} />
             </div>
-          )}
-        </CardBody>
-      </Card>
-    </div>
-  )
-}
-
-function MiniStat({ label, value }) {
-  return (
-    <div>
-      <span className="text-xs text-gray-400 dark:text-white/30">{label}: </span>
-      <span className="text-xs text-navy dark:text-white font-medium">{value}</span>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">{latestReport.title}</p>
+            {latestReport.content?.executiveSummary && (
+              <p className="text-xs text-slate-500 dark:text-white/50 mt-1 line-clamp-3 leading-relaxed">
+                {latestReport.content.executiveSummary}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
 
 function CheckInsTab({ checkIns }) {
-  const sorted = [...checkIns].sort((a, b) => b.month.localeCompare(a.month))
+  const sorted = [...checkIns].sort((a,b)=>b.month.localeCompare(a.month))
+  const latest3 = sorted.slice(0,3)
 
-  if (sorted.length === 0) {
-    return (
-      <Card>
-        <div className="px-6 py-12 text-center text-gray-400 text-sm">
-          No check-ins have been submitted yet.
-        </div>
-      </Card>
-    )
-  }
-
-  // Show side by side for last 3 months
-  const latest = sorted.slice(0, 3)
+  if (sorted.length === 0) return (
+    <Card><div className="p-8 text-center text-slate-400 text-sm">No check-ins submitted yet.</div></Card>
+  )
 
   return (
-    <div className="space-y-6">
-      {/* Side-by-side comparison */}
-      {latest.length > 1 && (
+    <div className="space-y-4">
+      {latest3.length > 1 && (
         <div>
-          <h3 className="text-sm font-semibold text-navy dark:text-white mb-3">
-            Month-by-month comparison
-          </h3>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Side-by-side comparison</h3>
           <div className="overflow-x-auto">
-            <div className="min-w-max grid gap-4" style={{ gridTemplateColumns: `repeat(${latest.length}, minmax(280px, 1fr))` }}>
-              {latest.map((ci, idx) => (
-                <CheckInCard key={ci.id} checkIn={ci} prev={latest[idx + 1]} highlight={idx === 0} />
-              ))}
+            <div className="flex gap-3 min-w-max">
+              {latest3.map((ci, idx) => <CompareCard key={ci.id} ci={ci} prev={latest3[idx+1]} isLatest={idx===0} />)}
             </div>
           </div>
         </div>
       )}
 
-      {/* Full history */}
-      <div>
-        <h3 className="text-sm font-semibold text-navy dark:text-white mb-3">Full history</h3>
-        <div className="space-y-3">
-          {sorted.map((ci) => (
-            <CheckInRow key={ci.id} checkIn={ci} />
-          ))}
-        </div>
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Full history</h3>
+        {sorted.map(ci => <CheckInRow key={ci.id} ci={ci} />)}
       </div>
     </div>
   )
 }
 
-function CheckInCard({ checkIn: ci, prev, highlight }) {
-  const turnoverChange = prev && prev.data.estimatedTurnover > 0
+function CompareCard({ ci, prev, isLatest }) {
+  const change = prev?.data?.estimatedTurnover > 0
     ? ((ci.data.estimatedTurnover - prev.data.estimatedTurnover) / prev.data.estimatedTurnover * 100).toFixed(1)
     : null
 
   return (
-    <Card className={highlight ? 'border-gold/40' : ''}>
-      <CardHeader className={highlight ? '!bg-gold/5' : ''}>
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-navy dark:text-white text-sm">{ci.month}</span>
-          {highlight && <span className="text-xs text-gold font-medium">Latest</span>}
-          {ci.flags?.length > 0 && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle size={11} />
-              {ci.flags.length}
+    <div className={`w-64 card p-4 flex-shrink-0 ${isLatest ? 'ring-2 ring-[#2447F9]/30' : ''}`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-bold text-slate-900 dark:text-white text-sm">{ci.month}</span>
+        {isLatest && <span className="text-xs text-[#2447F9] font-semibold">Latest</span>}
+      </div>
+      <div className="space-y-2 text-xs">
+        <Row label="Turnover">
+          <strong>{formatTurnover(ci.data.estimatedTurnover)}</strong>
+          {change !== null && (
+            <span className={`ml-1 ${Math.abs(Number(change))>15?'text-amber-600':'text-slate-400'}`}>
+              ({change>0?'+':''}{change}%)
             </span>
           )}
+        </Row>
+        <Row label="Wage bill">{WAGE_BILL_LABELS[ci.data.wageBillChange]}</Row>
+        <Row label="Contracts">{CONTRACT_LABELS[ci.data.newContracts]}</Row>
+        <Row label="Incidents">{INCIDENT_LABELS[ci.data.incidents]}</Row>
+      </div>
+      {ci.flags?.length > 0 && (
+        <div className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 p-2">
+          {ci.flags.slice(0,2).map((f,i) => (
+            <p key={i} className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">· {f}</p>
+          ))}
         </div>
-      </CardHeader>
-      <CardBody className="space-y-2.5 !py-4">
-        <Field label="Turnover">
-          <span className="font-semibold">{formatTurnover(ci.data.estimatedTurnover)}</span>
-          {turnoverChange !== null && (
-            <span className={`ml-1 text-xs font-medium ${Math.abs(Number(turnoverChange)) > 15 ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
-              ({turnoverChange > 0 ? '+' : ''}{turnoverChange}%)
-            </span>
-          )}
-        </Field>
-        <Field label="Wage bill">{WAGE_BILL_LABELS[ci.data.wageBillChange]}</Field>
-        <Field label="Staff">{STAFF_CHANGE_LABELS[ci.data.staffChange]}</Field>
-        <Field label="Contracts">{CONTRACT_LABELS[ci.data.newContracts]}</Field>
-        <Field label="New work types">{ci.data.newTypesOfWork ? 'Yes' : 'No'}</Field>
-        <Field label="New assets">{ci.data.newAssets ? `Yes — ${ci.data.newAssetsDetails}` : 'No'}</Field>
-        <Field label="Incidents">{INCIDENT_LABELS[ci.data.incidents]}</Field>
-        {ci.data.futureChanges && (
-          <Field label="Future changes">
-            <span className="text-gray-500 dark:text-white/50">{ci.data.futureChanges}</span>
-          </Field>
-        )}
-        {ci.data.otherFlags && (
-          <Field label="Other flags">
-            <span className="text-gray-500 dark:text-white/50">{ci.data.otherFlags}</span>
-          </Field>
-        )}
-
-        {ci.flags?.length > 0 && (
-          <div className="pt-2 border-t border-gray-50 dark:border-white/5 mt-2">
-            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Flags raised:</p>
-            {ci.flags.map((f, i) => (
-              <p key={i} className="text-xs text-amber-600 dark:text-amber-400/80 leading-snug">· {f}</p>
-            ))}
-          </div>
-        )}
-      </CardBody>
-    </Card>
-  )
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <span className="text-xs text-gray-400 dark:text-white/30 block">{label}</span>
-      <div className="text-xs text-navy dark:text-white font-medium mt-0.5">{children}</div>
+      )}
     </div>
   )
 }
 
-function CheckInRow({ checkIn: ci }) {
-  const [expanded, setExpanded] = useState(false)
+function Row({ label, children }) {
+  return (
+    <div>
+      <span className="text-slate-400">{label}: </span>
+      <span className="text-slate-800 dark:text-white font-medium">{children}</span>
+    </div>
+  )
+}
 
+function CheckInRow({ ci }) {
+  const [open, setOpen] = useState(false)
   return (
     <Card>
-      <div
-        className="px-5 py-4 cursor-pointer flex items-center gap-4"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-navy dark:text-white">{ci.month}</span>
+      <div className="p-4 cursor-pointer" onClick={() => setOpen(v=>!v)}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-semibold text-slate-900 dark:text-white text-sm">{ci.month}</span>
             {ci.flags?.length > 0 && (
-              <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                <AlertTriangle size={11} />
-                {ci.flags.length} flag{ci.flags.length > 1 ? 's' : ''}
-              </span>
+              <span className="ml-2 text-xs text-amber-600 font-medium">{ci.flags.length} flag{ci.flags.length>1?'s':''}</span>
             )}
           </div>
-          <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">
-            Submitted {format(parseISO(ci.submittedAt), 'd MMM yyyy')} ·{' '}
-            Turnover: {formatTurnover(ci.data.estimatedTurnover)}
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">{formatTurnover(ci.data.estimatedTurnover)}</span>
+            {open ? <ChevronUp size={14} className="text-slate-400"/> : <ChevronDown size={14} className="text-slate-400"/>}
+          </div>
         </div>
-        <ChevronRight
-          size={16}
-          className={`text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
+        {open && (
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/10 grid grid-cols-2 gap-2 text-xs">
+            <Row label="Wage bill">{WAGE_BILL_LABELS[ci.data.wageBillChange]}</Row>
+            <Row label="Staff">{STAFF_CHANGE_LABELS[ci.data.staffChange]}</Row>
+            <Row label="Contracts">{CONTRACT_LABELS[ci.data.newContracts]}</Row>
+            <Row label="New work">{ci.data.newTypesOfWork?'Yes':'No'}</Row>
+            <Row label="Assets">{ci.data.newAssets?`Yes — ${ci.data.newAssetsDetails}`:'No'}</Row>
+            <Row label="Incidents">{INCIDENT_LABELS[ci.data.incidents]}</Row>
+            {ci.data.futureChanges && <div className="col-span-2"><Row label="Future">{ci.data.futureChanges}</Row></div>}
+            {ci.flags?.length > 0 && (
+              <div className="col-span-2 bg-amber-50 dark:bg-amber-900/20 rounded-xl p-2 mt-1">
+                {ci.flags.map((f,i) => <p key={i} className="text-[11px] text-amber-700 dark:text-amber-400">· {f}</p>)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      {expanded && (
-        <div className="px-5 pb-4 border-t border-gray-50 dark:border-white/5 pt-4 grid sm:grid-cols-2 gap-2">
-          <Field label="Wage bill">{WAGE_BILL_LABELS[ci.data.wageBillChange]}</Field>
-          <Field label="Staff changes">{STAFF_CHANGE_LABELS[ci.data.staffChange]}</Field>
-          <Field label="New contracts">{CONTRACT_LABELS[ci.data.newContracts]}</Field>
-          <Field label="New work types">{ci.data.newTypesOfWork ? 'Yes' : 'No'}</Field>
-          <Field label="New assets">{ci.data.newAssets ? `Yes — ${ci.data.newAssetsDetails}` : 'No'}</Field>
-          <Field label="Incidents">{INCIDENT_LABELS[ci.data.incidents]}</Field>
-          {ci.data.futureChanges && (
-            <div className="sm:col-span-2">
-              <Field label="Expected changes (90 days)">{ci.data.futureChanges}</Field>
-            </div>
-          )}
-          {ci.data.otherFlags && (
-            <div className="sm:col-span-2">
-              <Field label="Other flags">{ci.data.otherFlags}</Field>
-            </div>
-          )}
-          {ci.flags?.length > 0 && (
-            <div className="sm:col-span-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mt-1">
-              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Governance flags raised:</p>
-              {ci.flags.map((f, i) => (
-                <p key={i} className="text-xs text-amber-700 dark:text-amber-300">· {f}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </Card>
   )
 }
 
-function ReportsTab({ reports, client, onNew, onEdit }) {
+function ReportsTab({ reports, onNew, onEdit }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-navy dark:text-white">
-          Governance Reports ({reports.length})
-        </h3>
-        <button
-          onClick={onNew}
-          className="flex items-center gap-2 px-4 py-2 bg-gold text-navy font-medium text-sm rounded-lg hover:bg-gold-300 transition-colors"
-        >
-          <FileText size={13} />
-          New Report
+        <h3 className="font-bold text-slate-900 dark:text-white text-sm">Reports ({reports.length})</h3>
+        <button onClick={onNew} className="flex items-center gap-1.5 rounded-full bg-btn-primary px-4 py-2 text-xs font-semibold text-white shadow-btn">
+          <Plus size={13}/> New Report
         </button>
       </div>
-
-      {reports.length === 0 && (
-        <Card>
-          <div className="px-6 py-12 text-center text-gray-400 text-sm">
-            No reports have been generated for this client yet.
-          </div>
-        </Card>
-      )}
-
-      {reports.map((r) => (
-        <Card key={r.id} className="hover:border-gold/40 transition-colors">
-          <div className="px-6 py-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <StatusBadge status={r.status} />
-                  <span className="text-xs text-gray-400 dark:text-white/40">{r.period}</span>
-                </div>
-                <h4 className="font-semibold text-navy dark:text-white text-sm">{r.title}</h4>
-                {r.content?.executiveSummary && (
-                  <p className="text-xs text-gray-500 dark:text-white/40 mt-1 line-clamp-2">
-                    {r.content.executiveSummary}
-                  </p>
-                )}
-                <p className="text-xs text-gray-400 dark:text-white/30 mt-2">
-                  Created {format(parseISO(r.createdAt), 'd MMM yyyy')}
-                  {r.publishedAt && ` · Published ${format(parseISO(r.publishedAt), 'd MMM yyyy')}`}
-                </p>
-              </div>
-              <button
-                onClick={() => onEdit(r)}
-                className="flex-shrink-0 text-xs text-gold hover:underline"
-              >
-                Edit / Export
-              </button>
+      {reports.map(r => (
+        <Card key={r.id} onClick={() => onEdit(r)}>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-1">
+              <StatusBadge status={r.status} />
+              <span className="text-xs text-slate-400">{r.period}</span>
             </div>
+            <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">{r.title}</p>
+            {r.content?.executiveSummary && (
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{r.content.executiveSummary}</p>
+            )}
           </div>
         </Card>
       ))}
+      {reports.length === 0 && <Card><div className="p-8 text-center text-slate-400 text-sm">No reports yet.</div></Card>}
     </div>
   )
 }

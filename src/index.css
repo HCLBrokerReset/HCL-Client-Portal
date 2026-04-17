@@ -7,91 +7,78 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100%;
   }
 
   body {
-    @apply bg-surface text-navy;
+    min-height: 100%;
+    background: radial-gradient(circle at top, #335dff 0%, #0d1b2a 38%, #07111f 100%);
+    min-height: 100svh;
   }
 
   .dark body {
-    @apply bg-navy text-white;
+    background: radial-gradient(circle at top, #213a9c 0%, #081225 40%, #040914 100%);
+  }
+
+  /* App surface — the inner scrollable area */
+  .app-surface {
+    background-color: #F4F7FF;
+  }
+  .dark .app-surface {
+    background-color: #0b1426;
   }
 
   /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-200 rounded-full;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-300;
-  }
-
-  .dark ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
+  .dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
 }
 
 @layer components {
-  /* Premium form inputs */
-  input, select, textarea {
-    @apply transition-colors;
+  /* Cards */
+  .card {
+    @apply rounded-[28px] bg-white shadow-card dark:bg-[#101a2e];
   }
 
-  /* Gold divider */
-  .gold-divider {
-    @apply h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent;
+  /* Gradient buttons */
+  .btn-primary {
+    @apply rounded-[22px] bg-btn-primary px-4 py-4 text-sm font-bold text-white shadow-btn transition-transform active:scale-[0.97];
   }
 
-  /* Premium card hover */
-  .card-hover {
-    @apply hover:shadow-premium-lg hover:border-gold/30 transition-all;
+  .btn-gold {
+    @apply rounded-[22px] bg-btn-gold px-4 py-4 text-sm font-bold text-navy shadow-gold transition-transform active:scale-[0.97];
   }
 
-  /* Status colours */
-  .status-current { @apply text-emerald-600; }
-  .status-flag { @apply text-amber-600; }
-  .status-action { @apply text-red-600; }
+  .btn-success {
+    @apply rounded-[22px] bg-btn-success px-4 py-4 text-sm font-bold text-white transition-transform active:scale-[0.97];
+  }
 
-  /* Line clamp utilities */
+  .btn-ghost {
+    @apply rounded-[22px] bg-slate-100 px-4 py-4 text-sm font-bold text-slate-800 transition-transform active:scale-[0.97] dark:bg-white/5 dark:text-white;
+  }
+
+  /* Glass pill */
+  .glass-pill {
+    @apply inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white;
+  }
+
+  /* Line clamp */
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-
-  .line-clamp-4 {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
 }
 
-/* Dark mode transitions */
-.dark {
-  color-scheme: dark;
-}
-
-/* Print styles for report */
-@media print {
-  .no-print {
-    display: none !important;
-  }
+/* Safe area for bottom nav */
+.pb-safe {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
 }

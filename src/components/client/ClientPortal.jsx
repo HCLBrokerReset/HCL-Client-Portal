@@ -1,19 +1,14 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useData } from '../../context/DataContext'
 import { format, parseISO, differenceInDays } from 'date-fns'
 import {
-  ClipboardCheck, FileText, MessageSquare, AlertTriangle, CheckCircle,
-  Clock, ChevronRight, Building2, User,
+  Activity, ClipboardList, FileText, MessageSquare,
+  ArrowRight, CalendarClock, AlertTriangle, CheckCircle2,
 } from 'lucide-react'
+import Card, { HeroCard, DarkCard, MetricTile, GlassPill } from '../common/Card'
 import StatusBadge from '../common/StatusBadge'
-import RenewalCountdown from '../common/RenewalCountdown'
-import Card, { CardHeader, CardBody } from '../common/Card'
-import {
-  WAGE_BILL_LABELS, STAFF_CHANGE_LABELS, CONTRACT_LABELS,
-  INCIDENT_LABELS, formatTurnover,
-} from '../../utils/flagging'
+import { formatTurnover, WAGE_BILL_LABELS } from '../../utils/flagging'
 
 export default function ClientPortal() {
   const navigate = useNavigate()
@@ -21,257 +16,167 @@ export default function ClientPortal() {
   const { getClient, getCheckIns, getReports, getMessages } = useData()
 
   const client = getClient(user.clientId)
-  if (!client) return <div className="text-center py-16 text-gray-400">Client record not found.</div>
+  if (!client) return <div className="text-center py-16 text-slate-400 text-sm">Client record not found.</div>
 
   const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
   const checkIns = getCheckIns(user.clientId)
-  const sorted = [...checkIns].sort((a, b) => b.month.localeCompare(a.month))
-  const currentMonthCheckIn = checkIns.find((c) => c.month === currentMonth)
-  const lastThree = sorted.slice(0, 3)
+  const sorted = [...checkIns].sort((a,b)=>b.month.localeCompare(a.month))
+  const currentCheckIn = checkIns.find(c=>c.month===currentMonth)
+  const lastThree = sorted.slice(0,3)
 
-  const reports = getReports(user.clientId).filter((r) => r.status === 'published')
-  const latestReport = reports[0]
+  const publishedReports = getReports(user.clientId).filter(r=>r.status==='published')
+  const latestReport = publishedReports[0]
 
   const messages = getMessages(user.clientId)
-  const unreadCount = messages.filter((m) => !m.read && m.senderRole !== 'client').length
+  const unread = messages.filter(m=>!m.read && m.senderRole!=='client').length
 
-  const daysToRenewal = differenceInDays(parseISO(client.renewalDate), now)
-  const renewalUrgent = daysToRenewal <= 60
+  const days = differenceInDays(parseISO(client.renewalDate), now)
+
+  const heroGrad = {
+    'file-current': 'bg-card-hero',
+    'flag-raised': 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]',
+    'action-required': 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]',
+  }[client.status] || 'bg-card-hero'
+
+  const statusLabel = {
+    'file-current': 'File current',
+    'flag-raised': 'Flag raised',
+    'action-required': 'Action required',
+    overdue: 'Overdue',
+  }[client.status] || client.status
 
   return (
-    <div className="space-y-8">
-      {/* Welcome */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <p className="text-xs text-gold font-semibold uppercase tracking-widest mb-1">
-            Welcome back
-          </p>
-          <h1 className="text-2xl font-semibold text-navy dark:text-white tracking-tight">
-            {client.businessName}
-          </h1>
-          <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
-            {format(now, 'EEEE, d MMMM yyyy')}
-          </p>
+    <div className="space-y-4">
+      {/* Hero status card */}
+      <div className={`rounded-[30px] ${heroGrad} p-5 text-white shadow-hero`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-white/75">Governance status</div>
+            <div className="mt-1 text-3xl font-bold leading-tight">{statusLabel}</div>
+          </div>
+          <div className="grid h-14 w-14 place-items-center rounded-[22px] bg-white/15 flex-shrink-0">
+            <Activity size={24} />
+          </div>
         </div>
-        <StatusBadge status={client.status} className="self-start sm:self-auto" />
+        {client.notes
+          ? <p className="mt-3 text-sm text-white/80">{client.notes}</p>
+          : <p className="mt-3 text-sm text-white/80">Your governance file is being monitored. Complete your monthly check-in to keep it current.</p>
+        }
+        <div className="flex gap-2 mt-4 flex-wrap">
+          <GlassPill>Renewal {format(parseISO(client.renewalDate),'d MMM yyyy')}</GlassPill>
+          <GlassPill>Broker {client.brokerName}</GlassPill>
+        </div>
       </div>
 
-      {/* Prompt to complete check-in */}
-      {!currentMonthCheckIn && (
-        <div
-          className="bg-navy dark:bg-white/10 rounded-2xl p-5 cursor-pointer hover:bg-navy-50 transition-colors group"
-          onClick={() => navigate('/portal/checkin')}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gold rounded-xl flex items-center justify-center flex-shrink-0">
-                <ClipboardCheck size={22} className="text-navy" />
-              </div>
-              <div>
-                <p className="text-white font-semibold">
-                  {format(now, 'MMMM yyyy')} check-in due
-                </p>
-                <p className="text-white/50 text-sm mt-0.5">
-                  Please complete your monthly governance check-in
-                </p>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-gold group-hover:translate-x-1 transition-transform" />
-          </div>
-        </div>
-      )}
-
-      {currentMonthCheckIn && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
-            <CheckCircle size={22} className="text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <p className="text-emerald-800 dark:text-emerald-300 font-semibold">
-              {format(now, 'MMMM yyyy')} check-in complete
-            </p>
-            <p className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
-              Submitted {format(parseISO(currentMonthCheckIn.submittedAt), 'd MMM yyyy')}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Key info cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card gold className="hover:border-gold/60 transition-colors cursor-pointer" onClick={() => navigate('/portal/checkin')}>
-          <CardBody>
-            <div className="flex items-center gap-2 text-gray-400 dark:text-white/30 mb-2">
-              <Building2 size={14} />
-              <span className="text-xs uppercase tracking-wide">Your broker</span>
-            </div>
-            <p className="text-navy dark:text-white font-semibold text-sm">{client.brokerName}</p>
-            <p className="text-gray-400 dark:text-white/40 text-xs mt-0.5">{client.brokerCompany}</p>
-          </CardBody>
-        </Card>
-
-        <Card className="cursor-pointer hover:border-gold/40 transition-colors" onClick={() => navigate('/portal/reports')}>
-          <CardBody>
-            <div className="flex items-center gap-2 text-gray-400 dark:text-white/30 mb-2">
-              <Clock size={14} />
-              <span className="text-xs uppercase tracking-wide">Policy renewal</span>
-            </div>
-            <RenewalCountdown renewalDate={client.renewalDate} />
-          </CardBody>
-        </Card>
-
-        <Card className={`cursor-pointer hover:border-gold/40 transition-colors ${unreadCount > 0 ? 'border-navy/20 dark:border-gold/30' : ''}`}
-          onClick={() => navigate('/portal/messages')}>
-          <CardBody>
-            <div className="flex items-center gap-2 text-gray-400 dark:text-white/30 mb-2">
-              <MessageSquare size={14} />
-              <span className="text-xs uppercase tracking-wide">Messages</span>
-            </div>
-            <p className="text-navy dark:text-white font-semibold text-sm">
-              {unreadCount > 0 ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-gold rounded-full" />
-                  {unreadCount} unread
-                </span>
-              ) : (
-                'No new messages'
-              )}
-            </p>
-            <p className="text-gray-400 dark:text-white/40 text-xs mt-0.5">From Barry at HCL</p>
-          </CardBody>
-        </Card>
+      {/* Metric tiles */}
+      <div className="grid grid-cols-2 gap-3">
+        <MetricTile
+          icon={CalendarClock}
+          label="Countdown"
+          value={days >= 0 ? `${days}d` : 'Due'}
+          sub="To renewal"
+          gradient={days <= 60 ? 'alert' : 'dark'}
+        />
+        <MetricTile
+          icon={FileText}
+          label="Latest report"
+          value={latestReport ? 'Ready' : 'None'}
+          sub={latestReport ? latestReport.period : 'Pending from HCL'}
+          gradient="success"
+        />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Last 3 check-ins */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-navy dark:text-white">Recent check-ins</h2>
-              <button
-                onClick={() => navigate('/portal/checkin')}
-                className="text-xs text-gold hover:underline flex items-center gap-1"
-              >
-                New check-in <ChevronRight size={12} />
-              </button>
-            </div>
-          </CardHeader>
-          <CardBody className="!p-0">
-            {lastThree.length === 0 ? (
-              <p className="text-sm text-gray-400 px-6 py-8 text-center">
-                No check-ins yet. Complete your first one above.
-              </p>
-            ) : (
-              <div className="divide-y divide-gray-50 dark:divide-white/5">
-                {lastThree.map((ci) => (
-                  <div key={ci.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-navy dark:text-white">{ci.month}</span>
-                      {ci.flags?.length > 0 ? (
-                        <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                          <AlertTriangle size={11} />
-                          {ci.flags.length} flag{ci.flags.length > 1 ? 's' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <CheckCircle size={11} />
-                          Clear
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                      <MiniStat label="Turnover" value={formatTurnover(ci.data.estimatedTurnover)} />
-                      <MiniStat label="Wage bill" value={WAGE_BILL_LABELS[ci.data.wageBillChange]} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* Latest report */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-navy dark:text-white flex items-center gap-2">
-                <FileText size={14} className="text-gray-400" />
-                Latest governance report
-              </h2>
-              {reports.length > 1 && (
-                <button
-                  onClick={() => navigate('/portal/reports')}
-                  className="text-xs text-gold hover:underline flex items-center gap-1"
-                >
-                  All reports <ChevronRight size={12} />
-                </button>
-              )}
-            </div>
-          </CardHeader>
-          <CardBody>
-            {!latestReport ? (
-              <div className="py-4 text-center">
-                <p className="text-sm text-gray-400">No reports published yet.</p>
-                <p className="text-xs text-gray-300 dark:text-white/20 mt-1">
-                  Barry at HCL will publish your first quarterly report here.
-                </p>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <StatusBadge status={latestReport.status} />
-                  <span className="text-xs text-gray-400 dark:text-white/40">{latestReport.period}</span>
+      {/* Check-in prompt / done confirmation */}
+      {!currentCheckIn ? (
+        <Card onClick={() => navigate('/portal/checkin')}>
+          <div className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1">
+                <div className="font-bold text-slate-900 dark:text-white text-base">
+                  {format(now,'MMMM yyyy')} check-in
                 </div>
-                <h3 className="text-sm font-semibold text-navy dark:text-white mb-2">
-                  {latestReport.title}
-                </h3>
-                {latestReport.content?.executiveSummary && (
-                  <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed line-clamp-3">
-                    {latestReport.content.executiveSummary}
-                  </p>
-                )}
-                <button
-                  onClick={() => navigate('/portal/reports')}
-                  className="mt-3 text-xs text-gold hover:underline flex items-center gap-1"
-                >
-                  View full report <ChevronRight size={12} />
-                </button>
+                <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Not done yet</div>
               </div>
-            )}
-          </CardBody>
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-hcl-gold flex-shrink-0">
+                <ClipboardList size={18} className="text-navy" />
+              </div>
+            </div>
+            <button className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
+              Start monthly check-in <ArrowRight size={15}/>
+            </button>
+          </div>
         </Card>
-      </div>
-
-      {/* Renewal reminder */}
-      {renewalUrgent && (
-        <div className={`rounded-2xl border p-5 flex items-start gap-4 ${
-          daysToRenewal <= 30
-            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-        }`}>
-          <AlertTriangle size={18} className={daysToRenewal <= 30 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} />
-          <div>
-            <p className={`font-semibold text-sm ${daysToRenewal <= 30 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
-              Your policy renewal is in {daysToRenewal} days
-            </p>
-            <p className={`text-xs mt-0.5 ${daysToRenewal <= 30 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              Please ensure your broker ({client.brokerName} at {client.brokerCompany}) has all up-to-date information
-              about your business before the renewal date of {format(parseISO(client.renewalDate), 'd MMMM yyyy')}.
-            </p>
+      ) : (
+        <div className="rounded-[28px] bg-[linear-gradient(135deg,#17B26A,#3DD598)] p-4 text-white">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={22} />
+            <div>
+              <p className="font-bold text-sm">{format(now,'MMMM yyyy')} check-in complete</p>
+              <p className="text-white/80 text-xs mt-0.5">
+                Submitted {format(parseISO(currentCheckIn.submittedAt),'d MMM yyyy')}
+                {currentCheckIn.flags?.length > 0 && ` · ${currentCheckIn.flags.length} flags raised`}
+              </p>
+            </div>
           </div>
         </div>
       )}
-    </div>
-  )
-}
 
-function MiniStat({ label, value }) {
-  return (
-    <div>
-      <span className="text-xs text-gray-400 dark:text-white/30">{label}: </span>
-      <span className="text-xs text-navy dark:text-white font-medium">{value}</span>
+      {/* Last 3 check-ins */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white px-1">Recent check-ins</h3>
+        {lastThree.length === 0 ? (
+          <Card><div className="p-6 text-center text-slate-400 text-sm">No check-ins yet.</div></Card>
+        ) : (
+          lastThree.map(ci => (
+            <Card key={ci.id}>
+              <div className="p-4 flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-slate-900 dark:text-white text-sm">{ci.month}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Turnover {formatTurnover(ci.data.estimatedTurnover)}
+                  </div>
+                </div>
+                {ci.flags?.length > 0
+                  ? <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 flex-shrink-0"><AlertTriangle size={11}/>{ci.flags.length} flagged</span>
+                  : <span className="text-xs text-emerald-600 font-semibold flex-shrink-0">Clear</span>
+                }
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Messages prompt */}
+      {unread > 0 && (
+        <Card onClick={() => navigate('/portal/messages')}>
+          <div className="p-4 flex items-center gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-btn-primary flex-shrink-0">
+              <MessageSquare size={18} className="text-white"/>
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-slate-900 dark:text-white text-sm">{unread} unread message{unread>1?'s':''}</p>
+              <p className="text-xs text-slate-500 mt-0.5">From Barry at HCL</p>
+            </div>
+            <ArrowRight size={16} className="text-slate-400"/>
+          </div>
+        </Card>
+      )}
+
+      {/* Renewal warning */}
+      {days <= 60 && days >= 0 && (
+        <div className={`rounded-[28px] p-4 ${days<=30 ? 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]' : 'bg-[linear-gradient(135deg,#FF7A59,#F7A35C)]/80'} text-white`}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="flex-shrink-0 mt-0.5"/>
+            <div>
+              <p className="font-bold text-sm">Renewal in {days} days</p>
+              <p className="text-white/80 text-xs mt-1">
+                Ensure {client.brokerName} at {client.brokerCompany} has all current information before {format(parseISO(client.renewalDate),'d MMMM yyyy')}.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,30 +2,27 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useData } from '../../context/DataContext'
 import { format } from 'date-fns'
-import { CheckCircle, AlertTriangle, ChevronRight, ChevronLeft, Info } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { analyseCheckIn, formatTurnover } from '../../utils/flagging'
 import { notifyAdminOfFlags, notifyClientCheckInReceived } from '../../utils/emailNotifications'
-import Card, { CardBody } from '../common/Card'
+import Card, { DarkCard, GlassPill } from '../common/Card'
 
-const STEPS = ['Business overview', 'People & contracts', 'Risk & changes', 'Review & submit']
+const STEPS = ['Overview', 'People', 'Risk', 'Review']
 
-export default function CheckInForm({ onComplete }) {
+export default function CheckInForm() {
   const { user } = useAuth()
   const { getClient, getCheckIns, createCheckIn, updateClient } = useData()
 
   const client = getClient(user.clientId)
   const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
   const checkIns = getCheckIns(user.clientId)
-  const sorted = [...checkIns].sort((a, b) => a.month.localeCompare(b.month))
-  // Find the most recent check-in that is NOT for the current month (for comparison)
-  const prevCheckIn = [...sorted].reverse().find((ci) => ci.month !== currentMonth) || null
-  const alreadySubmitted = checkIns.find((ci) => ci.month === currentMonth)
+  const prevCheckIn = [...checkIns].sort((a,b)=>b.month.localeCompare(a.month)).find(ci=>ci.month!==currentMonth) || null
+  const alreadySubmitted = checkIns.find(ci=>ci.month===currentMonth)
 
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
   const [raisedFlags, setRaisedFlags] = useState([])
-
   const [form, setForm] = useState({
     estimatedTurnover: '',
     wageBillChange: 'no-change',
@@ -38,525 +35,318 @@ export default function CheckInForm({ onComplete }) {
     futureChanges: '',
     otherFlags: '',
   })
-
-  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }))
+  const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
   const handleSubmit = async () => {
-    const data = {
-      ...form,
-      estimatedTurnover: Number(form.estimatedTurnover) || 0,
-    }
-
-    const flags = analyseCheckIn(data, prevCheckIn?.data || null)
-    const checkIn = createCheckIn({
-      clientId: user.clientId,
-      month: currentMonth,
-      data,
-      flags,
-      alertSent: flags.length > 0,
-    })
-
-    // Update client status if flags raised
-    if (flags.length > 0) {
-      const hasSignificant = flags.some((f) => f.includes('Significant incident') || (f.includes('Wage bill') && f.includes('significantly')))
+    const data = { ...form, estimatedTurnover: Number(form.estimatedTurnover)||0 }
+    const flags = analyseCheckIn(data, prevCheckIn?.data||null)
+    createCheckIn({ clientId: user.clientId, month: currentMonth, data, flags, alertSent: flags.length>0 })
+    if (flags.length>0) {
+      const hasSignificant = flags.some(f=>f.includes('Significant')||(f.includes('Wage')&&f.includes('significantly')))
       updateClient(user.clientId, { status: hasSignificant ? 'action-required' : 'flag-raised' })
+      await notifyAdminOfFlags({ clientName: client.businessName, clientId: user.clientId, month: currentMonth, flags })
     }
-
-    // Notifications (console placeholder)
-    if (flags.length > 0) {
-      await notifyAdminOfFlags({
-        clientName: client.businessName,
-        clientId: user.clientId,
-        month: currentMonth,
-        flags,
-      })
-    }
-
-    await notifyClientCheckInReceived({
-      clientEmail: client.contactEmail,
-      clientName: client.contactName,
-      month: currentMonth,
-      hasFlags: flags.length > 0,
-    })
-
+    await notifyClientCheckInReceived({ clientEmail: client.contactEmail, clientName: client.contactName, month: currentMonth, hasFlags: flags.length>0 })
     setRaisedFlags(flags)
     setSubmitted(true)
-    if (onComplete) onComplete()
   }
-
-  const canProceed = [
-    form.estimatedTurnover !== '' && Number(form.estimatedTurnover) >= 0,
-    true, // step 1 always valid
-    true, // step 2 always valid
-    true, // review always valid
-  ][step]
 
   if (alreadySubmitted && !submitted) {
     return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-5">
-          <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <h2 className="text-xl font-semibold text-navy dark:text-white mb-2">Already submitted</h2>
-        <p className="text-gray-500 dark:text-white/40 text-sm">
-          Your {currentMonth} check-in has already been submitted. Only one check-in per month is required.
-        </p>
-        <p className="text-xs text-gray-400 dark:text-white/30 mt-3">
-          Return to your dashboard to view your file status.
-        </p>
+      <div className="space-y-4">
+        <DarkCard>
+          <GlassPill>Monthly check-in</GlassPill>
+          <h1 className="mt-3 text-2xl font-bold">Already submitted</h1>
+          <p className="mt-2 text-sm text-white/80">{currentMonth} has already been received.</p>
+        </DarkCard>
+        <Card><div className="p-6 text-center">
+          <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-3"/>
+          <p className="text-slate-600 dark:text-white/70 text-sm">One check-in per month is all that's needed. You're all done.</p>
+        </div></Card>
       </div>
     )
   }
 
-  if (submitted) {
-    return (
-      <SuccessScreen
-        flags={raisedFlags}
-        month={currentMonth}
-        turnover={Number(form.estimatedTurnover)}
-      />
-    )
-  }
+  if (submitted) return <SuccessScreen flags={raisedFlags} month={currentMonth} />
+
+  const canProceed = step===0 ? (form.estimatedTurnover!=='' && Number(form.estimatedTurnover)>=0) : true
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-navy dark:text-white tracking-tight">
-          Monthly Check-In
+      <DarkCard>
+        <GlassPill>Monthly check-in</GlassPill>
+        <h1 className="mt-3 text-2xl font-bold leading-tight">
+          Fast. Tappable.<br/>Proper app flow.
         </h1>
-        <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
-          {format(now, 'MMMM yyyy')} — {client?.businessName}
+        <p className="mt-2 text-sm text-white/80">
+          {format(now,'MMMM yyyy')} · {client?.businessName}
         </p>
-      </div>
-
-      {/* Progress */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center gap-2 flex-1">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-colors ${
-                  i < step
-                    ? 'bg-emerald-500 text-white'
-                    : i === step
-                    ? 'bg-navy dark:bg-gold dark:text-navy text-white'
-                    : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-white/30'
-                }`}
-              >
-                {i < step ? <CheckCircle size={14} /> : i + 1}
-              </div>
-              <span
-                className={`text-xs font-medium hidden sm:block ${
-                  i === step ? 'text-navy dark:text-white' : 'text-gray-400 dark:text-white/30'
-                }`}
-              >
-                {s}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10 mx-2" />
-              )}
-            </div>
+        {/* Progress dots */}
+        <div className="flex gap-2 mt-4">
+          {STEPS.map((s,i) => (
+            <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${i<=step?'bg-white':'bg-white/25'}`}/>
           ))}
         </div>
-      </div>
+        <div className="text-xs text-white/60 mt-1">Step {step+1} of {STEPS.length} — {STEPS[step]}</div>
+      </DarkCard>
 
-      {/* Previous month comparison notice */}
-      {prevCheckIn && step === 0 && (
-        <div className="flex gap-3 bg-navy/5 dark:bg-white/5 border border-navy/10 dark:border-white/10 rounded-xl px-4 py-3 mb-6">
-          <Info size={15} className="text-navy/50 dark:text-white/30 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-navy/60 dark:text-white/50">
-            Your last check-in was in <strong>{prevCheckIn.month}</strong> with a declared turnover of{' '}
-            <strong>{formatTurnover(prevCheckIn.data.estimatedTurnover)}</strong>. Changes exceeding 15%
-            will automatically raise a governance alert.
-          </p>
+      {/* Previous month note */}
+      {prevCheckIn && step===0 && (
+        <div className="rounded-[20px] bg-[#2447F9]/10 dark:bg-[#2447F9]/20 border border-[#2447F9]/20 px-4 py-3 text-sm text-[#2447F9] dark:text-blue-300">
+          Last month: <strong>{formatTurnover(prevCheckIn.data.estimatedTurnover)}</strong> — changes over 15% trigger a governance alert.
         </div>
       )}
 
-      <Card>
-        <CardBody className="!p-0">
-          {step === 0 && <Step0 form={form} set={set} />}
-          {step === 1 && <Step1 form={form} set={set} />}
-          {step === 2 && <Step2 form={form} set={set} />}
-          {step === 3 && <StepReview form={form} prevData={prevCheckIn?.data} client={client} month={currentMonth} />}
-        </CardBody>
-      </Card>
+      {/* Step content */}
+      {step===0 && <Step0 form={form} set={set}/>}
+      {step===1 && <Step1 form={form} set={set}/>}
+      {step===2 && <Step2 form={form} set={set}/>}
+      {step===3 && <StepReview form={form} prev={prevCheckIn?.data} month={currentMonth}/>}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between mt-6">
-        <button
-          type="button"
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-400 hover:text-navy dark:hover:text-white transition-colors disabled:opacity-0 disabled:pointer-events-none"
-        >
-          <ChevronLeft size={16} />
-          Back
-        </button>
+      <div className="flex items-center justify-between gap-3">
+        {step > 0 ? (
+          <button onClick={()=>setStep(s=>s-1)}
+            className="btn-ghost flex items-center gap-2 flex-1">
+            <ChevronLeft size={16}/> Back
+          </button>
+        ) : <div className="flex-1"/>}
 
-        {step < STEPS.length - 1 ? (
-          <button
-            type="button"
-            onClick={() => setStep((s) => s + 1)}
-            disabled={!canProceed}
-            className="flex items-center gap-2 px-6 py-2.5 bg-navy dark:bg-gold dark:text-navy text-white font-medium text-sm rounded-lg hover:bg-navy-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Continue
-            <ChevronRight size={16} />
+        {step < STEPS.length-1 ? (
+          <button onClick={()=>setStep(s=>s+1)} disabled={!canProceed}
+            className="btn-primary flex items-center justify-center gap-2 flex-1 disabled:opacity-50">
+            Continue <ChevronRight size={16}/>
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gold text-navy font-semibold text-sm rounded-lg hover:bg-gold-300 transition-colors shadow-gold"
-          >
-            <CheckCircle size={16} />
-            Submit check-in
+          <button onClick={handleSubmit}
+            className="btn-success flex items-center justify-center gap-2 flex-1">
+            Submit check-in <Send size={15}/>
           </button>
         )}
       </div>
     </div>
   )
 }
-
-// ---- Step 0: Business overview ----
 
 function Step0({ form, set }) {
   return (
-    <div className="p-6 space-y-6">
-      <SectionTitle step={1} title="Business overview" subtitle="Tell us about this month's financials" />
-
-      <FormField
-        label="Estimated turnover this month"
-        hint="Your best estimate of revenue generated this month"
-        required
-      >
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">£</span>
-          <input
-            type="number"
-            min="0"
-            step="1000"
-            value={form.estimatedTurnover}
-            onChange={(e) => set('estimatedTurnover', e.target.value)}
+    <div className="space-y-3">
+      <QCard title="Estimated turnover this month" hint="Your best estimate of revenue this month">
+        <div className="relative mt-3">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">£</span>
+          <input type="number" min="0" step="1000" value={form.estimatedTurnover}
+            onChange={e=>set('estimatedTurnover',e.target.value)}
             placeholder="0"
-            className="w-full pl-8 pr-4 py-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-navy-100 text-navy dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold"
+            className="w-full rounded-[20px] border-0 bg-slate-100 pl-8 pr-4 py-4 text-sm outline-none focus:ring-2 focus:ring-royal/30 dark:bg-white/5 dark:text-white"
           />
         </div>
-      </FormField>
-
-      <FormField
-        label="Has your wage bill changed since last month?"
-        hint="Including employer NI, pension contributions, and any overtime"
-      >
-        <Select
-          value={form.wageBillChange}
-          onChange={(v) => set('wageBillChange', v)}
+      </QCard>
+      <QCard title="Has your wage bill changed?">
+        <TwoChoice value={form.wageBillChange} onChange={v=>set('wageBillChange',v)}
           options={[
-            { value: 'no-change', label: 'No change' },
-            { value: 'increased-slightly', label: 'Increased slightly' },
-            { value: 'increased-significantly', label: 'Increased significantly' },
-            { value: 'decreased', label: 'Decreased' },
+            {v:'no-change',l:'No change'},
+            {v:'increased-slightly',l:'Increased slightly'},
+            {v:'increased-significantly',l:'Increased significantly'},
+            {v:'decreased',l:'Decreased'},
           ]}
         />
-      </FormField>
+      </QCard>
     </div>
   )
 }
-
-// ---- Step 1: People & contracts ----
 
 function Step1({ form, set }) {
   return (
-    <div className="p-6 space-y-6">
-      <SectionTitle step={2} title="People & contracts" subtitle="Staff changes and new business" />
-
-      <FormField label="Have staff numbers changed?">
-        <Select
-          value={form.staffChange}
-          onChange={(v) => set('staffChange', v)}
+    <div className="space-y-3">
+      <QCard title="Have staff numbers changed?">
+        <TwoChoice value={form.staffChange} onChange={v=>set('staffChange',v)}
           options={[
-            { value: 'no-change', label: 'No change' },
-            { value: 'hired-1-2', label: 'Hired 1–2 staff' },
-            { value: 'hired-3-or-more', label: 'Hired 3 or more staff' },
-            { value: 'reduced-headcount', label: 'Reduced headcount' },
+            {v:'no-change',l:'No change'},
+            {v:'hired-1-2',l:'Hired 1–2'},
+            {v:'hired-3-or-more',l:'Hired 3 or more'},
+            {v:'reduced-headcount',l:'Reduced headcount'},
           ]}
         />
-      </FormField>
-
-      <FormField label="New contracts or clients won this month?">
-        <Select
-          value={form.newContracts}
-          onChange={(v) => set('newContracts', v)}
-          options={[
-            { value: 'no', label: 'No' },
-            { value: 'yes-small', label: 'Yes — small contract' },
-            { value: 'yes-significant', label: 'Yes — significant contract' },
-          ]}
+      </QCard>
+      <QCard title="New contracts or clients won?">
+        <TwoChoice value={form.newContracts} onChange={v=>set('newContracts',v)}
+          options={[{v:'no',l:'No'},{v:'yes-small',l:'Yes — small'},{v:'yes-significant',l:'Yes — significant'}]}
         />
-      </FormField>
-
-      <FormField
-        label="Started any new types of work not done before?"
-        hint="e.g. entering a new trade, sector, or activity type"
-      >
-        <YesNo value={form.newTypesOfWork} onChange={(v) => set('newTypesOfWork', v)} />
-      </FormField>
+      </QCard>
+      <QCard title="Started any new types of work not done before?">
+        <YesNo value={form.newTypesOfWork} onChange={v=>set('newTypesOfWork',v)}/>
+      </QCard>
     </div>
   )
 }
-
-// ---- Step 2: Risk & changes ----
 
 function Step2({ form, set }) {
   return (
-    <div className="p-6 space-y-6">
-      <SectionTitle step={3} title="Risk & changes" subtitle="Assets, incidents, and future plans" />
-
-      <FormField
-        label="New premises, vehicles, or equipment?"
-        hint="Any significant asset additions this month"
-      >
-        <YesNo value={form.newAssets} onChange={(v) => set('newAssets', v)} />
-      </FormField>
-
+    <div className="space-y-3">
+      <QCard title="New premises, vehicles, or equipment?">
+        <YesNo value={form.newAssets} onChange={v=>set('newAssets',v)}/>
+      </QCard>
       {form.newAssets && (
-        <FormField label="Please describe the new assets" required>
-          <textarea
-            value={form.newAssetsDetails}
-            onChange={(e) => set('newAssetsDetails', e.target.value)}
-            rows={2}
-            placeholder="e.g. Two new vans, site cabin on Runcorn project…"
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-navy-100 text-navy dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 resize-none"
-          />
-        </FormField>
+        <QCard title="Describe the new assets">
+          <textarea value={form.newAssetsDetails} onChange={e=>set('newAssetsDetails',e.target.value)}
+            rows={2} placeholder="e.g. Two new vans, site cabin…"
+            className="w-full rounded-[20px] border-0 bg-slate-100 px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-royal/30 dark:bg-white/5 dark:text-white resize-none mt-3"/>
+        </QCard>
       )}
-
-      <FormField label="Any incidents, near misses, complaints or potential claims?">
-        <Select
-          value={form.incidents}
-          onChange={(v) => set('incidents', v)}
-          options={[
-            { value: 'no', label: 'No' },
-            { value: 'minor', label: 'Minor incident / near-miss / complaint' },
-            { value: 'significant', label: 'Significant incident / claim / potential claim' },
-          ]}
+      <QCard title="Any incidents, near misses, or potential claims?">
+        <TwoChoice value={form.incidents} onChange={v=>set('incidents',v)}
+          options={[{v:'no',l:'No'},{v:'minor',l:'Minor'},{v:'significant',l:'Significant'}]}
         />
-      </FormField>
-
-      <FormField
-        label="Significant changes expected in the next 90 days?"
-        hint="New projects, contracts, staff changes, relocations etc."
-      >
-        <textarea
-          value={form.futureChanges}
-          onChange={(e) => set('futureChanges', e.target.value)}
-          rows={3}
-          placeholder="Optional — tell us what's coming up…"
-          className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-navy-100 text-navy dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 resize-none"
-        />
-      </FormField>
-
-      <FormField label="Anything else to flag?">
-        <textarea
-          value={form.otherFlags}
-          onChange={(e) => set('otherFlags', e.target.value)}
-          rows={2}
-          placeholder="Optional — any other information relevant to your governance file…"
-          className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-navy-100 text-navy dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 resize-none"
-        />
-      </FormField>
+      </QCard>
+      <QCard title="Significant changes expected in next 90 days?">
+        <textarea value={form.futureChanges} onChange={e=>set('futureChanges',e.target.value)}
+          rows={3} placeholder="New projects, contracts, staff changes…"
+          className="w-full rounded-[20px] border-0 bg-slate-100 px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-royal/30 dark:bg-white/5 dark:text-white resize-none mt-3"/>
+      </QCard>
+      <QCard title="Anything else to flag?">
+        <textarea value={form.otherFlags} onChange={e=>set('otherFlags',e.target.value)}
+          rows={2} placeholder="Type here…"
+          className="w-full rounded-[20px] border-0 bg-slate-100 px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-royal/30 dark:bg-white/5 dark:text-white resize-none mt-3"/>
+      </QCard>
     </div>
   )
 }
 
-// ---- Step 3: Review ----
-
-function StepReview({ form, prevData, client, month }) {
-  const data = { ...form, estimatedTurnover: Number(form.estimatedTurnover) || 0 }
-  const flags = analyseCheckIn(data, prevData || null)
-
-  const turnoverChange = prevData?.estimatedTurnover > 0
-    ? ((data.estimatedTurnover - prevData.estimatedTurnover) / prevData.estimatedTurnover * 100).toFixed(1)
+function StepReview({ form, prev, month }) {
+  const data = {...form, estimatedTurnover: Number(form.estimatedTurnover)||0}
+  const flags = analyseCheckIn(data, prev||null)
+  const change = prev?.estimatedTurnover>0
+    ? ((data.estimatedTurnover-prev.estimatedTurnover)/prev.estimatedTurnover*100).toFixed(1)
     : null
 
+  const WBL = v => ({  'no-change':'No change','increased-slightly':'Increased slightly','increased-significantly':'Increased significantly',decreased:'Decreased' }[v]||v)
+  const SCL = v => ({ 'no-change':'No change','hired-1-2':'Hired 1–2','hired-3-or-more':'Hired 3+','reduced-headcount':'Reduced' }[v]||v)
+  const CL  = v => ({ no:'No','yes-small':'Yes – small','yes-significant':'Yes – significant' }[v]||v)
+  const IL  = v => ({ no:'No',minor:'Minor',significant:'Significant' }[v]||v)
+
   return (
-    <div className="p-6 space-y-6">
-      <SectionTitle step={4} title="Review & submit" subtitle="Check your answers before submitting" />
+    <div className="space-y-3">
+      <Card>
+        <div className="p-4 space-y-2">
+          <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-3">Your answers</p>
+          <ReviewRow label="Turnover">
+            <strong>{formatTurnover(data.estimatedTurnover)}</strong>
+            {change!==null && <span className={`ml-1.5 text-xs font-semibold ${Math.abs(Number(change))>15?'text-amber-600':'text-slate-400'}`}>({change>0?'+':''}{change}%)</span>}
+          </ReviewRow>
+          <ReviewRow label="Wage bill">{WBL(form.wageBillChange)}</ReviewRow>
+          <ReviewRow label="Staff">{SCL(form.staffChange)}</ReviewRow>
+          <ReviewRow label="Contracts">{CL(form.newContracts)}</ReviewRow>
+          <ReviewRow label="New work">{form.newTypesOfWork?'Yes':'No'}</ReviewRow>
+          <ReviewRow label="New assets">{form.newAssets?`Yes — ${form.newAssetsDetails||'…'}`:'No'}</ReviewRow>
+          <ReviewRow label="Incidents">{IL(form.incidents)}</ReviewRow>
+          {form.futureChanges && <ReviewRow label="Future">{form.futureChanges}</ReviewRow>}
+          {form.otherFlags && <ReviewRow label="Other">{form.otherFlags}</ReviewRow>}
+        </div>
+      </Card>
 
-      <div className="space-y-3">
-        <ReviewRow label="Estimated turnover">
-          <span className="font-semibold">{formatTurnover(data.estimatedTurnover)}</span>
-          {turnoverChange !== null && (
-            <span className={`ml-2 text-xs font-medium ${Math.abs(Number(turnoverChange)) > 15 ? 'text-amber-600' : 'text-gray-400'}`}>
-              ({turnoverChange > 0 ? '+' : ''}{turnoverChange}% vs last month)
-            </span>
-          )}
-        </ReviewRow>
-        <ReviewRow label="Wage bill change">{WBL(form.wageBillChange)}</ReviewRow>
-        <ReviewRow label="Staff numbers">{SCL(form.staffChange)}</ReviewRow>
-        <ReviewRow label="New contracts">{CL(form.newContracts)}</ReviewRow>
-        <ReviewRow label="New types of work">{form.newTypesOfWork ? 'Yes' : 'No'}</ReviewRow>
-        <ReviewRow label="New assets">
-          {form.newAssets ? `Yes — ${form.newAssetsDetails || 'details not provided'}` : 'No'}
-        </ReviewRow>
-        <ReviewRow label="Incidents">{IL(form.incidents)}</ReviewRow>
-        {form.futureChanges && (
-          <ReviewRow label="Future changes">{form.futureChanges}</ReviewRow>
-        )}
-        {form.otherFlags && (
-          <ReviewRow label="Other flags">{form.otherFlags}</ReviewRow>
-        )}
-      </div>
-
-      {flags.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400" />
-            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-              {flags.length} governance alert{flags.length > 1 ? 's' : ''} will be raised
-            </p>
-          </div>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
-            Barry at HCL will be notified automatically and will follow up with you.
+      {flags.length>0 ? (
+        <div className="rounded-[24px] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+          <p className="font-bold text-amber-700 dark:text-amber-400 text-sm flex items-center gap-2 mb-2">
+            <AlertTriangle size={14}/> {flags.length} governance alert{flags.length>1?'s':''} will be raised
           </p>
-          <ul className="space-y-1">
-            {flags.map((f, i) => (
-              <li key={i} className="text-xs text-amber-700 dark:text-amber-300">· {f}</li>
-            ))}
-          </ul>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">Barry at HCL will be notified automatically.</p>
+          {flags.map((f,i)=><p key={i} className="text-xs text-amber-700 dark:text-amber-300">· {f}</p>)}
+        </div>
+      ) : (
+        <div className="rounded-[24px] bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4 flex items-center gap-3">
+          <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400"/>
+          <p className="text-sm text-emerald-700 dark:text-emerald-400">No governance alerts this month. File looks current.</p>
         </div>
       )}
-
-      {flags.length === 0 && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-center gap-3">
-          <CheckCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
-          <p className="text-sm text-emerald-700 dark:text-emerald-400">
-            No governance alerts this month. Your file looks current.
-          </p>
-        </div>
-      )}
-
-      <p className="text-xs text-gray-400 dark:text-white/30 leading-relaxed">
-        By submitting this check-in you confirm the information provided is accurate to the best of your knowledge.
-        HCL provides non-advised governance services only. All insurance decisions remain with your FCA-regulated broker.
+      <p className="text-xs text-slate-400 leading-relaxed px-1">
+        By submitting you confirm this information is accurate. HCL provides non-advised governance services only.
       </p>
     </div>
   )
 }
 
-// Helper label functions for review
-const WBL = (v) => ({ 'no-change': 'No change', 'increased-slightly': 'Increased slightly', 'increased-significantly': 'Increased significantly', decreased: 'Decreased' }[v] || v)
-const SCL = (v) => ({ 'no-change': 'No change', 'hired-1-2': 'Hired 1–2 staff', 'hired-3-or-more': 'Hired 3 or more staff', 'reduced-headcount': 'Reduced headcount' }[v] || v)
-const CL = (v) => ({ no: 'No', 'yes-small': 'Yes — small contract', 'yes-significant': 'Yes — significant contract' }[v] || v)
-const IL = (v) => ({ no: 'No', minor: 'Minor incident / near-miss', significant: 'Significant incident / claim' }[v] || v)
-
 function ReviewRow({ label, children }) {
   return (
-    <div className="flex gap-3 py-2.5 border-b border-gray-50 dark:border-white/5 last:border-0">
-      <span className="text-xs text-gray-400 dark:text-white/30 w-36 flex-shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm text-navy dark:text-white flex-1">{children}</span>
+    <div className="flex gap-3 py-2 border-b border-slate-100 dark:border-white/5 last:border-0 text-sm">
+      <span className="text-slate-400 w-24 flex-shrink-0 text-xs pt-0.5">{label}</span>
+      <span className="text-slate-800 dark:text-white flex-1">{children}</span>
     </div>
   )
 }
 
-// ---- Shared sub-components ----
-
-function SectionTitle({ step, title, subtitle }) {
+function QCard({ title, hint, children }) {
   return (
-    <div>
-      <p className="text-xs text-gold font-semibold uppercase tracking-widest mb-1">Step {step} of 4</p>
-      <h2 className="text-lg font-semibold text-navy dark:text-white">{title}</h2>
-      {subtitle && <p className="text-sm text-gray-400 dark:text-white/40 mt-0.5">{subtitle}</p>}
-    </div>
+    <Card>
+      <div className="p-4">
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">{title}</p>
+        {hint && <p className="text-xs text-slate-400 mt-0.5">{hint}</p>}
+        {children}
+      </div>
+    </Card>
   )
 }
 
-function FormField({ label, hint, required, children }) {
+function TwoChoice({ value, onChange, options }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-navy dark:text-white mb-1">
-        {label}
-        {required && <span className="text-gold ml-1">*</span>}
-      </label>
-      {hint && <p className="text-xs text-gray-400 dark:text-white/30 mb-2">{hint}</p>}
-      {children}
-    </div>
-  )
-}
-
-function Select({ value, onChange, options }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-navy-100 text-navy dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold appearance-none"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      {options.map(o => (
+        <button key={o.v} onClick={()=>onChange(o.v)}
+          className={`rounded-[18px] px-3 py-3 text-sm font-semibold transition-all ${
+            value===o.v
+              ? 'bg-btn-primary text-white shadow-btn'
+              : 'bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300'
+          }`}>
+          {o.l}
+        </button>
       ))}
-    </select>
+    </div>
   )
 }
 
 function YesNo({ value, onChange }) {
   return (
-    <div className="flex gap-3">
-      {[{ label: 'No', val: false }, { label: 'Yes', val: true }].map(({ label, val }) => (
-        <button
-          key={label}
-          type="button"
-          onClick={() => onChange(val)}
-          className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-all ${
-            value === val
-              ? 'bg-navy dark:bg-gold dark:text-navy text-white border-navy dark:border-gold'
-              : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/50 hover:border-navy dark:hover:border-white/30'
-          }`}
-        >
-          {label}
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      {[{v:false,l:'No'},{v:true,l:'Yes'}].map(o => (
+        <button key={String(o.v)} onClick={()=>onChange(o.v)}
+          className={`rounded-[18px] px-3 py-3 text-sm font-semibold transition-all ${
+            value===o.v
+              ? 'bg-btn-primary text-white shadow-btn'
+              : 'bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300'
+          }`}>
+          {o.l}
         </button>
       ))}
     </div>
   )
 }
 
-function SuccessScreen({ flags, month, turnover }) {
+function SuccessScreen({ flags, month }) {
   return (
-    <div className="max-w-md mx-auto text-center py-12">
-      <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-5">
-        <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
+    <div className="space-y-4">
+      <div className="rounded-[30px] bg-[linear-gradient(135deg,#17B26A,#3DD598)] p-6 text-white shadow-hero text-center">
+        <CheckCircle2 size={48} className="mx-auto mb-3 opacity-90"/>
+        <h2 className="text-2xl font-bold">Check-in submitted</h2>
+        <p className="text-white/80 text-sm mt-2">{month} received by HCL</p>
       </div>
-      <h2 className="text-xl font-semibold text-navy dark:text-white mb-2">Check-in submitted</h2>
-      <p className="text-gray-500 dark:text-white/40 text-sm mb-6">
-        Your {month} governance check-in has been received.
-      </p>
-
-      {flags.length > 0 ? (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-left mb-6">
-          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-2">
-            <AlertTriangle size={14} />
-            {flags.length} governance alert{flags.length > 1 ? 's' : ''} raised
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
-            Barry at HCL has been notified and will follow up with you shortly.
-          </p>
-          {flags.map((f, i) => (
-            <p key={i} className="text-xs text-amber-700 dark:text-amber-300">· {f}</p>
-          ))}
-        </div>
+      {flags.length>0 ? (
+        <Card>
+          <div className="p-4">
+            <p className="font-bold text-amber-700 dark:text-amber-400 text-sm flex items-center gap-2 mb-2">
+              <AlertTriangle size={14}/>{flags.length} governance alert{flags.length>1?'s':''} raised
+            </p>
+            <p className="text-xs text-slate-500 dark:text-white/50 mb-2">Barry at HCL has been notified and will follow up.</p>
+            {flags.map((f,i)=><p key={i} className="text-xs text-amber-700 dark:text-amber-400">· {f}</p>)}
+          </div>
+        </Card>
       ) : (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 mb-6">
-          <p className="text-sm text-emerald-700 dark:text-emerald-400">
-            No governance alerts this month. Your file is current.
-          </p>
-        </div>
+        <Card>
+          <div className="p-4 flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-emerald-500"/>
+            <p className="text-sm text-slate-700 dark:text-white/80">No alerts this month. Your file is current.</p>
+          </div>
+        </Card>
       )}
-
-      <p className="text-xs text-gray-400 dark:text-white/30">
-        You can return to your dashboard to view your file status.
-      </p>
     </div>
   )
 }

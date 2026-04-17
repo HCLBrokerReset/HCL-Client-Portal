@@ -1,101 +1,81 @@
 import { useAuth } from '../../context/AuthContext'
 import { useData } from '../../context/DataContext'
 import { format, parseISO } from 'date-fns'
-import { CheckCircle, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
-import Card, { CardHeader, CardBody } from '../common/Card'
+import Card, { DarkCard, GlassPill } from '../common/Card'
 
 export default function BrokerActions() {
   const { user } = useAuth()
   const { getClients, getBrokerActions } = useData()
 
-  const myClients = getClients().filter((c) => c.brokerId === user.brokerId)
-  const allActions = myClients.flatMap((c) =>
-    getBrokerActions(c.id).map((a) => ({ ...a, clientName: c.businessName }))
-  ).sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt))
+  const myClients = getClients().filter(c=>c.brokerId===user.brokerId)
+  const all = myClients
+    .flatMap(c => getBrokerActions(c.id).map(a=>({...a,clientName:c.businessName})))
+    .sort((a,b)=>new Date(b.sentAt)-new Date(a.sentAt))
 
-  const open = allActions.filter((a) => a.status !== 'resolved')
-  const resolved = allActions.filter((a) => a.status === 'resolved')
+  const open = all.filter(a=>a.status!=='resolved')
+  const resolved = all.filter(a=>a.status==='resolved')
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-navy dark:text-white tracking-tight">
-          Open Actions
-        </h1>
-        <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
-          Actions and communications from Herron Consultants Limited
-        </p>
-      </div>
+    <div className="space-y-4">
+      <DarkCard>
+        <GlassPill>HCL Communications</GlassPill>
+        <h1 className="mt-2 text-2xl font-bold">Open Actions</h1>
+        <p className="text-sm text-white/75 mt-1">Actions and communications from Herron Consultants Limited</p>
+      </DarkCard>
 
-      {open.length === 0 && (
+      {open.length===0 && (
         <Card>
-          <CardBody>
-            <div className="text-center py-8">
-              <CheckCircle size={32} className="text-emerald-400 mx-auto mb-3" />
-              <p className="text-sm font-medium text-navy dark:text-white">No open actions</p>
-              <p className="text-xs text-gray-400 dark:text-white/40 mt-1">
-                All communications from HCL are resolved or awaiting response.
-              </p>
-            </div>
-          </CardBody>
+          <div className="p-8 text-center">
+            <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-3"/>
+            <p className="font-semibold text-slate-900 dark:text-white text-sm">No open actions</p>
+            <p className="text-xs text-slate-400 mt-1">All communications are resolved.</p>
+          </div>
         </Card>
       )}
 
-      {open.length > 0 && (
+      {open.length>0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-navy dark:text-white">
-            Requiring attention ({open.length})
-          </h2>
-          {open.map((a) => <ActionRow key={a.id} action={a} />)}
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white px-1">Requiring attention ({open.length})</h2>
+          {open.map(a => <ActionRow key={a.id} action={a}/>)}
         </div>
       )}
 
-      {resolved.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-navy dark:text-white opacity-60">
-            Resolved ({resolved.length})
-          </h2>
-          {resolved.map((a) => <ActionRow key={a.id} action={a} resolved />)}
+      {resolved.length>0 && (
+        <div className="space-y-3 opacity-60">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white px-1">Resolved ({resolved.length})</h2>
+          {resolved.map(a => <ActionRow key={a.id} action={a}/>)}
         </div>
       )}
     </div>
   )
 }
 
-function ActionRow({ action, resolved }) {
+function ActionRow({ action }) {
   return (
-    <Card className={resolved ? 'opacity-60' : ''}>
-      <div className="px-5 py-4">
-        <div className="flex items-start justify-between gap-4 mb-2">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-navy dark:text-white">
-                {action.clientName}
-              </span>
-              <StatusBadge status={action.status} />
-            </div>
-            <p className="text-sm text-gray-600 dark:text-white/70 leading-relaxed">
-              {action.description}
-            </p>
-          </div>
-          {action.status === 'escalated' && (
-            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-          )}
+    <Card>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <span className="text-sm font-bold text-slate-900 dark:text-white">{action.clientName}</span>
+          <StatusBadge status={action.status}/>
         </div>
-
+        <p className="text-sm text-slate-600 dark:text-white/70 leading-relaxed">{action.description}</p>
         {action.notes && (
-          <div className="bg-gray-50 dark:bg-white/5 rounded-lg px-3 py-2 mb-2">
-            <p className="text-xs text-gray-500 dark:text-white/50">{action.notes}</p>
+          <div className="mt-2 rounded-[16px] bg-slate-50 dark:bg-white/5 px-3 py-2 text-xs text-slate-500 dark:text-white/50">{action.notes}</div>
+        )}
+        <div className="flex gap-4 text-xs text-slate-400 mt-2">
+          <span>Sent {format(parseISO(action.sentAt),'d MMM yyyy')}</span>
+          {action.respondedAt && <span>Responded {format(parseISO(action.respondedAt),'d MMM yyyy')}</span>}
+        </div>
+        {action.status!=='resolved' && (
+          <div className="flex gap-2 mt-3">
+            <button className="btn-success flex-1 py-3 text-xs flex items-center justify-center gap-1.5">
+              <CheckCircle2 size={13}/> Mark done
+            </button>
+            <button className="btn-ghost flex-1 py-3 text-xs">Reply to HCL</button>
           </div>
         )}
-
-        <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-white/30">
-          <span>Sent {format(parseISO(action.sentAt), 'd MMM yyyy')}</span>
-          {action.respondedAt && (
-            <span>Responded {format(parseISO(action.respondedAt), 'd MMM yyyy')}</span>
-          )}
-        </div>
       </div>
     </Card>
   )
