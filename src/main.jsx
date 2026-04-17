@@ -12,7 +12,7 @@ initialiseStorage()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter basename="/hcl-client-portal">
+    <BrowserRouter basename="/HCL-Client-Portal">
       <AuthProvider>
         <DataProvider>
           <App />
