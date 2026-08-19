@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HMO Field App">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1C3D3D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --teal-dark:#1C3D3D;
+    --teal-mid:#2A5454;
+    --teal-accent:#4A9E8A;
+    --cream:#F7F4EF;
+    --cream-warm:#EDE9E1;
+    --gold:#B8965A;
+    --gold-light:#D4AF76;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;padding:0;}
+  body{
+    font-family:'DM Sans',sans-serif;
+    background:var(--cream);
+    color:var(--teal-dark);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;}
+
+  /* ---------- unauthorized ---------- */
+  .unauth{
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:var(--teal-dark);color:var(--cream);text-align:center;padding:32px;
+  }
+  .unauth h1{font-size:28px;color:var(--gold-light);margin-bottom:8px;}
+  .unauth p{font-size:14px;line-height:1.6;color:var(--cream-warm);max-width:320px;}
+  .unauth .email{color:var(--gold);font-weight:600;}
+
+  /* ---------- app shell ---------- */
+  #app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+
+  header.top-bar{
+    flex:0 0 auto;
+    background:var(--teal-dark);
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 20px 12px;
+    text-align:center;
+    position:relative;
+  }
+  header.top-bar .wordmark{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:600;
+    font-size:22px;
+    letter-spacing:0.02em;
+    color:var(--cream);
+  }
+  header.top-bar .wordmark .dot{color:var(--gold);padding:0 6px;}
+  header.top-bar .underline{
+    width:64px;height:2px;background:var(--gold);margin:8px auto 0;
+  }
+  header.top-bar .screen-title{
+    font-family:'Cormorant Garamond',serif;
+    font-size:15px;
+    color:var(--gold-light);
+    margin-top:6px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+  }
+  header.top-bar .back-btn{
+    position:absolute;left:14px;top:calc(env(safe-area-inset-top,0px) + 14px);
+    color:var(--gold-light);font-size:15px;font-weight:500;
+    display:flex;align-items:center;gap:4px;
+  }
+
+  main.content{
+    flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:16px 16px calc(96px + env(safe-area-inset-bottom,0px));
+  }
+
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* ---------- bottom nav ---------- */
+  nav.bottom-nav{
+    position:fixed;left:0;right:0;bottom:0;
+    background:var(--teal-dark);
+    display:flex;
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -2px 12px rgba(0,0,0,0.2);
+    z-index:20;
+  }
+  nav.bottom-nav .nav-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:6px 2px;color:var(--cream-warm);opacity:0.6;
+    font-size:11px;font-weight:500;background:none;border:none;
+  }
+  nav.bottom-nav .nav-btn svg{width:22px;height:22px;stroke:currentColor;}
+  nav.bottom-nav .nav-btn.active{color:var(--gold);opacity:1;}
+
+  /* ---------- loading / empty ---------- */
+  .loading, .empty-state{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:60px 20px;color:var(--teal-mid);
+  }
+  .empty-state .serif{font-size:20px;margin-bottom:6px;color:var(--teal-dark);}
+  .empty-state p{font-size:13px;color:var(--teal-mid);opacity:0.8;}
+  .spinner{
+    width:26px;height:26px;border-radius:50%;
+    border:3px solid var(--cream-warm);border-top-color:var(--gold);
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- date group header ---------- */
+  .date-heading{
+    font-family:'Cormorant Garamond',serif;font-weight:600;font-size:16px;
+    color:var(--teal-mid);margin:20px 0 8px;padding-left:2px;
+  }
+  .date-heading:first-child{margin-top:0;}
+
+  /* ---------- client card ---------- */
+  .client-card{
+    background:var(--cream);
+    border-left:4px solid var(--gold);
+    border-radius:8px;
+    padding:12px 14px;
+    margin-bottom:10px;
+    box-shadow:0 2px 8px rgba(28,61,61,0.08);
+    display:flex;align-items:center;gap:10px;
+  }
+  .client-card .card-main{flex:1;min-width:0;}
+  .client-card .card-name{
+    font-family:'Cormorant Garamond',serif;font-weight:700;font-size:18px;
+    color:var(--teal-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .client-card .card-meta{
+    font-size:12px;color:var(--teal-mid);margin-top:2px;
+    display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;
+  }
+  .client-card .card-meta .time{color:var(--gold);font-weight:600;}
+  .client-card .card-meta .addr{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+  .client-card .card-actions{display:flex;gap:6px;flex:0 0 auto;}
+  .icon-btn{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--teal-dark);color:var(--cream);
+    display:flex;align-items:center;justify-content:center;
+    border:none;flex:0 0 auto;
+  }
+  .icon-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;}
+  .icon-btn.gold{background:var(--gold);color:var(--teal-dark);}
+
+  /* ---------- search ---------- */
+  .search-box{
+    display:flex;align-items:center;gap:8px;
+    background:var(--cream-warm);border-radius:8px;
+    padding:10px 12px;margin-bottom:16px;
+  }
+  .search-box svg{width:18px;height:18px;stroke:var(--teal-mid);flex:0 0 auto;}
+  .search-box input{
+    border:none;background:none;outline:none;flex:1;
+    font-family:'DM Sans',sans-serif;font-size:15px;color:var(--teal-dark);
+  }
+  .search-hint{font-size:13px;color:var(--teal-mid);opacity:0.7;padding:8px 2px;}
+
+  /* ---------- detail screen ---------- */
+  .detail-hero{
+    background:var(--teal-dark);border-radius:10px;padding:18px 16px;margin-bottom:16px;color:var(--cream);
+  }
+  .detail-hero .name{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:26px;color:var(--cream);}
+  .detail-hero .sub{font-size:12px;color:var(--cream-warm);opacity:0.85;margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;}
+  .detail-hero .row{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;}
+  .detail-hero .row svg{width:15px;height:15px;stroke:var(--gold-light);flex:0 0 auto;}
+  .detail-hero .row a{color:var(--cream);border-bottom:1px solid rgba(247,244,239,0.35);}
+
+  .info-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;
+  }
+  .info-cell{
+    background:var(--cream-warm);border-radius:8px;padding:10px 12px;
+  }
+  .info-cell .label{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--teal-mid);opacity:0.75;}
+  .info-cell .value{font-size:14px;font-weight:500;color:var(--teal-dark);margin-top:3px;}
+  .info-cell .value.gold{color:var(--gold);font-weight:600;font-family:'Cormorant Garamond',serif;font-size:17px;}
+
+  .section-title{
+    font-family:'Cormorant Garamond',serif;font-weight:600;font-size:17px;
+    color:var(--teal-dark);margin:20px 0 10px;
+  }
+
+  .toggle-row{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--cream-warm);border-radius:8px;padding:12px 14px;margin-bottom:10px;
+  }
+  .toggle-row .label{font-size:14px;font-weight:500;color:var(--teal-dark);}
+  .yn-toggle{display:flex;border-radius:20px;overflow:hidden;border:1px solid var(--teal-mid);}
+  .yn-toggle button{
+    padding:6px 14px;font-size:12px;font-weight:600;border:none;background:var(--cream);color:var(--teal-mid);
+  }
+  .yn-toggle button.on{background:var(--teal-accent);color:var(--cream);}
+
+  .method-toggle{display:flex;border-radius:20px;overflow:hidden;border:1px solid var(--teal-mid);}
+  .method-toggle button{
+    padding:6px 16px;font-size:12px;font-weight:600;border:none;background:var(--cream);color:var(--teal-mid);
+  }
+  .method-toggle button.on{background:var(--gold);color:var(--teal-dark);}
+
+  textarea.notes{
+    width:100%;min-height:110px;border-radius:8px;border:1px solid var(--cream-warm);
+    background:var(--cream);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--teal-dark);
+    resize:vertical;outline:none;
+  }
+  textarea.notes:focus{border-color:var(--teal-accent);}
+
+  .btn-gold{
+    background:var(--gold);color:var(--teal-dark);border:none;border-radius:4px;
+    padding:11px 18px;font-size:14px;font-weight:600;margin-top:10px;width:100%;
+  }
+  .btn-gold:disabled{opacity:0.45;}
+  .btn-gold.saved{background:var(--teal-accent);color:var(--cream);}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
+    background:var(--teal-dark);color:var(--cream);padding:10px 18px;border-radius:20px;
+    font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.25);
+    opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;
+    z-index:100;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.error{background:#7a3030;}
+</style>
+</head>
+<body>
+
+<? if (!authorized) { ?>
+  <div class="unauth">
+    <h1>Hear Me Out · Ear Care</h1>
+    <p>
+      This app is restricted to authorised staff.<br><br>
+      Signed in as <span class="email"><?= userEmail || '(no Google account detected)' ?></span><br><br>
+      If this should have access, contact the app administrator to be added to the allowed users list.
+    </p>
+  </div>
+<? } else { ?>
+
+  <div id="app">
+    <header class="top-bar">
+      <button class="back-btn" id="backBtn" style="display:none;" onclick="App.goBack()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M15 18l-6-6 6-6"/></svg>
+        Back
+      </button>
+      <div class="wordmark">Hear Me Out<span class="dot">&middot;</span>Ear Care</div>
+      <div class="underline"></div>
+      <div class="screen-title" id="screenTitle">Today</div>
+    </header>
+
+    <main class="content">
+
+      <!-- TODAY -->
+      <section class="screen active" id="screen-today">
+        <div id="today-list"><div class="loading"><div class="spinner"></div></div></div>
+      </section>
+
+      <!-- UPCOMING -->
+      <section class="screen" id="screen-upcoming">
+        <div id="upcoming-list"><div class="loading"><div class="spinner"></div></div></div>
+      </section>
+
+      <!-- SEARCH -->
+      <section class="screen" id="screen-search">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="searchInput" placeholder="Name, phone or postcode&hellip;" oninput="App.onSearchInput()">
+        </div>
+        <div id="search-results"><div class="search-hint">Start typing to search clients.</div></div>
+      </section>
+
+      <!-- RECALLS -->
+      <section class="screen" id="screen-recalls">
+        <div id="recalls-list"><div class="loading"><div class="spinner"></div></div></div>
+      </section>
+
+      <!-- DETAIL -->
+      <section class="screen" id="screen-detail">
+        <div id="detail-content"><div class="loading"><div class="spinner"></div></div></div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-screen="today" onclick="App.navigate('today')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Today
+      </button>
+      <button class="nav-btn" data-screen="upcoming" onclick="App.navigate('upcoming')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15h.01M12 15h.01M16 15h.01"/></svg>
+        Upcoming
+      </button>
+      <button class="nav-btn" data-screen="search" onclick="App.navigate('search')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Search
+      </button>
+      <button class="nav-btn" data-screen="recalls" onclick="App.navigate('recalls')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        Recalls
+      </button>
+    </nav>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+  var App = (function () {
+
+    var TAB_TITLES = { today: 'Today', upcoming: 'Upcoming', search: 'Search', recalls: 'Recalls' };
+    var history = []; // simple back-stack for the detail screen
+    var current = 'today';
+    var searchTimer = null;
+    var cache = { today: null, upcoming: null, recalls: null };
+
+    function toast(msg, isError) {
+      var el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = isError ? 'error show' : 'show';
+      clearTimeout(el._t);
+      el._t = setTimeout(function () { el.className = el.className.replace('show', ''); }, 2200);
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function fmtTime(hhmm) {
+      if (!hhmm || hhmm.indexOf(':') === -1) return hhmm || '';
+      var parts = hhmm.split(':');
+      var h = parseInt(parts[0], 10);
+      var m = parts[1];
+      var suffix = h >= 12 ? 'PM' : 'AM';
+      var h12 = h % 12; if (h12 === 0) h12 = 12;
+      return h12 + ':' + m + ' ' + suffix;
+    }
+
+    function fmtDateHeading(iso) {
+      if (!iso) return '';
+      var parts = iso.split('-');
+      var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    function mapsUrl(address) {
+      return 'https://maps.apple.com/?address=' + encodeURIComponent(address || '');
+    }
+
+    function telUrl(phone) {
+      return 'tel:' + String(phone || '').replace(/\s+/g, '');
+    }
+
+    function cardHtml(r, opts) {
+      opts = opts || {};
+      var metaBits = [];
+      if (opts.showTime !== false && r.time) metaBits.push('<span class="time">' + esc(fmtTime(r.time)) + '</span>');
+      if (opts.showDate && r.date) metaBits.push('<span>' + esc(fmtDateHeading(r.date)) + '</span>');
+      if (r.service) metaBits.push('<span>' + esc(r.service) + '</span>');
+      if (r.address) metaBits.push('<span class="addr">' + esc(r.address) + '</span>');
+      if (opts.showRecallDate && r.recallDate) metaBits.push('<span class="time">' + esc(fmtDateHeading(r.recallDate)) + '</span>');
+
+      return '' +
+        '<div class="client-card" onclick="App.openDetail(' + r.row + ')">' +
+          '<div class="card-main">' +
+            '<div class="card-name">' + esc(r.firstName) + ' ' + esc(r.lastName) + '</div>' +
+            '<div class="card-meta">' + metaBits.join('') + '</div>' +
+          '</div>' +
+          '<div class="card-actions">' +
+            (r.phone ? '<a class="icon-btn" href="' + telUrl(r.phone) + '" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.7a2 2 0 01-.4 2.1L8.1 9.7a16 16 0 006.2 6.2l1.2-1.2a2 2 0 012.1-.4c.9.3 1.8.5 2.7.6a2 2 0 011.7 2.1z"/></svg></a>' : '') +
+            (r.address ? '<a class="icon-btn gold" href="' + mapsUrl(r.address) + '" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg></a>' : '') +
+          '</div>' +
+        '</div>';
+    }
+
+    function emptyState(title, sub) {
+      return '<div class="empty-state"><div class="serif">' + esc(title) + '</div><p>' + esc(sub) + '</p></div>';
+    }
+
+    function run(fnName, args) {
+      return new Promise(function (resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(function (err) { reject(err); })[fnName].apply(null, args || []);
+      });
+    }
+
+    // ---------------- screens ----------------
+
+    function navigate(screen, opts) {
+      opts = opts || {};
+      if (!opts.fromDetail) history = [];
+      current = screen;
+      document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+      document.getElementById('screen-' + screen).classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-screen') === screen);
+      });
+      document.getElementById('backBtn').style.display = 'none';
+      document.getElementById('screenTitle').textContent = TAB_TITLES[screen] || '';
+      document.querySelector('nav.bottom-nav').style.display = 'flex';
+
+      if (screen === 'today') loadToday();
+      if (screen === 'upcoming') loadUpcoming();
+      if (screen === 'recalls') loadRecalls();
+    }
+
+    function loadToday(force) {
+      var el = document.getElementById('today-list');
+      if (cache.today && !force) { renderToday(cache.today); return; }
+      el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      run('getTodayAppointments').then(function (records) {
+        cache.today = records;
+        renderToday(records);
+      }).catch(function (err) { el.innerHTML = emptyState('Could not load', err.message || err); });
+    }
+
+    function renderToday(records) {
+      var el = document.getElementById('today-list');
+      if (!records.length) {
+        el.innerHTML = emptyState('No appointments today', 'Enjoy the quiet moment — nothing on the books.');
+        return;
+      }
+      el.innerHTML = records.map(function (r) { return cardHtml(r); }).join('');
+    }
+
+    function loadUpcoming(force) {
+      var el = document.getElementById('upcoming-list');
+      if (cache.upcoming && !force) { renderUpcoming(cache.upcoming); return; }
+      el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      run('getUpcomingAppointments').then(function (records) {
+        cache.upcoming = records;
+        renderUpcoming(records);
+      }).catch(function (err) { el.innerHTML = emptyState('Could not load', err.message || err); });
+    }
+
+    function renderUpcoming(records) {
+      var el = document.getElementById('upcoming-list');
+      if (!records.length) {
+        el.innerHTML = emptyState('Nothing coming up', 'No appointments in the next 7 days.');
+        return;
+      }
+      var html = '';
+      var lastDate = null;
+      records.forEach(function (r) {
+        if (r.date !== lastDate) {
+          html += '<div class="date-heading">' + esc(fmtDateHeading(r.date)) + '</div>';
+          lastDate = r.date;
+        }
+        html += cardHtml(r);
+      });
+      el.innerHTML = html;
+    }
+
+    function loadRecalls(force) {
+      var el = document.getElementById('recalls-list');
+      if (cache.recalls && !force) { renderRecalls(cache.recalls); return; }
+      el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      run('getRecalls').then(function (records) {
+        cache.recalls = records;
+        renderRecalls(records);
+      }).catch(function (err) { el.innerHTML = emptyState('Could not load', err.message || err); });
+    }
+
+    function renderRecalls(records) {
+      var el = document.getElementById('recalls-list');
+      if (!records.length) {
+        el.innerHTML = emptyState('No recalls due', 'Nothing needs a recall call in the next 60 days.');
+        return;
+      }
+      el.innerHTML = records.map(function (r) {
+        return cardHtml(r, { showTime: false, showDate: false, showRecallDate: true });
+      }).join('');
+    }
+
+    function onSearchInput() {
+      var q = document.getElementById('searchInput').value;
+      clearTimeout(searchTimer);
+      var el = document.getElementById('search-results');
+      if (!q.trim()) {
+        el.innerHTML = '<div class="search-hint">Start typing to search clients.</div>';
+        return;
+      }
+      el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      searchTimer = setTimeout(function () {
+        run('searchClients', [q]).then(function (records) {
+          if (!records.length) {
+            el.innerHTML = emptyState('No matches', 'Try a different name, phone number or postcode.');
+            return;
+          }
+          el.innerHTML = records.map(function (r) { return cardHtml(r, { showDate: true }); }).join('');
+        }).catch(function (err) { el.innerHTML = emptyState('Search failed', err.message || err); });
+      }, 300);
+    }
+
+    // ---------------- detail ----------------
+
+    function openDetail(row) {
+      history.push(current);
+      document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+      document.getElementById('screen-detail').classList.add('active');
+      document.getElementById('backBtn').style.display = 'flex';
+      document.getElementById('screenTitle').textContent = 'Client Detail';
+      document.querySelector('nav.bottom-nav').style.display = 'none';
+
+      var el = document.getElementById('detail-content');
+      el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      run('getClientByRow', [row]).then(renderDetail).catch(function (err) {
+        el.innerHTML = emptyState('Could not load client', err.message || err);
+      });
+    }
+
+    function goBack() {
+      var prev = history.pop() || 'today';
+      navigate(prev, { fromDetail: true });
+    }
+
+    function renderDetail(r) {
+      var el = document.getElementById('detail-content');
+      var html = '';
+
+      html += '<div class="detail-hero">' +
+        '<div class="name">' + esc(r.firstName) + ' ' + esc(r.lastName) + '</div>' +
+        '<div class="sub">' + esc(r.service || '') + (r.earsTreated ? ' &middot; ' + esc(r.earsTreated) : '') + '</div>';
+
+      if (r.phone) {
+        html += '<a class="row" href="' + telUrl(r.phone) + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.7a2 2 0 01-.4 2.1L8.1 9.7a16 16 0 006.2 6.2l1.2-1.2a2 2 0 012.1-.4c.9.3 1.8.5 2.7.6a2 2 0 011.7 2.1z"/></svg>' +
+          esc(r.phone) + '</a>';
+      }
+      if (r.address) {
+        html += '<a class="row" href="' + mapsUrl(r.address) + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+          esc(r.address) + (r.postcode ? ', ' + esc(r.postcode) : '') + '</a>';
+      }
+      if (r.email) {
+        html += '<a class="row" href="mailto:' + esc(r.email) + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>' +
+          esc(r.email) + '</a>';
+      }
+      html += '</div>';
+
+      html += '<div class="info-grid">' +
+        infoCell('Date', fmtDateHeading(r.date) || '&mdash;') +
+        infoCell('Time', fmtTime(r.time) || '&mdash;') +
+        infoCell('Deposit Paid', r.depositPaid || '&mdash;') +
+        infoCell('Deposit Amount', r.depositAmount ? '&pound;' + esc(r.depositAmount) : '&mdash;') +
+        infoCell('Balance Amount', r.balanceAmount ? '&pound;' + esc(r.balanceAmount) : '&mdash;') +
+        infoCell('Total Paid', r.totalPaid ? '&pound;' + esc(r.totalPaid) : '&mdash;', true) +
+        '</div>';
+
+      html += '<div class="section-title">Update on the spot</div>';
+
+      html += toggleRow('Wax Found', 'waxFound', r.waxFound);
+      html += toggleRow('Balance Paid', 'balancePaid', r.balancePaid);
+      html += methodRow(r.paymentMethod);
+
+      html += '<div class="section-title">Appointment Notes</div>' +
+        '<textarea class="notes" id="notesArea" oninput="App.onNotesChange()">' + esc(r.appointmentNotes) + '</textarea>' +
+        '<button class="btn-gold" id="saveNotesBtn" disabled onclick="App.saveNotes(' + r.row + ')">Save Notes</button>';
+
+      if (r.recallDate) {
+        html += '<div class="section-title">Recall</div>' +
+          '<div class="info-grid">' +
+            infoCell('Recall Date', fmtDateHeading(r.recallDate) || '&mdash;') +
+            infoCell('Recall Contacted', r.recallContacted || '&mdash;') +
+          '</div>';
+      }
+
+      el.innerHTML = html;
+      el.dataset.row = r.row;
+    }
+
+    function infoCell(label, value, gold) {
+      return '<div class="info-cell"><div class="label">' + esc(label) + '</div>' +
+        '<div class="value' + (gold ? ' gold' : '') + '">' + value + '</div></div>';
+    }
+
+    function toggleRow(label, field, value) {
+      var isY = String(value).trim().toUpperCase() === 'Y';
+      return '<div class="toggle-row"><div class="label">' + esc(label) + '</div>' +
+        '<div class="yn-toggle" data-field="' + field + '">' +
+          '<button class="' + (isY ? 'on' : '') + '" onclick="App.setToggle(this,\'' + field + '\',\'Y\')">Y</button>' +
+          '<button class="' + (!isY ? 'on' : '') + '" onclick="App.setToggle(this,\'' + field + '\',\'N\')">N</button>' +
+        '</div></div>';
+    }
+
+    function methodRow(value) {
+      var v = String(value || '').trim().toLowerCase();
+      return '<div class="toggle-row"><div class="label">Payment Method</div>' +
+        '<div class="method-toggle" data-field="paymentMethod">' +
+          '<button class="' + (v === 'card' ? 'on' : '') + '" onclick="App.setToggle(this,\'paymentMethod\',\'Card\')">Card</button>' +
+          '<button class="' + (v === 'cash' ? 'on' : '') + '" onclick="App.setToggle(this,\'paymentMethod\',\'Cash\')">Cash</button>' +
+        '</div></div>';
+    }
+
+    function setToggle(btn, field, value) {
+      var row = document.getElementById('detail-content').dataset.row;
+      var group = btn.parentElement;
+      Array.prototype.forEach.call(group.children, function (b) { b.classList.remove('on'); });
+      btn.classList.add('on');
+
+      run('updateField', [row, field, value]).then(function () {
+        toast('Saved');
+        invalidateListCaches();
+      }).catch(function (err) {
+        toast('Could not save: ' + (err.message || err), true);
+      });
+    }
+
+    function onNotesChange() {
+      document.getElementById('saveNotesBtn').disabled = false;
+      document.getElementById('saveNotesBtn').classList.remove('saved');
+      document.getElementById('saveNotesBtn').textContent = 'Save Notes';
+    }
+
+    function saveNotes(row) {
+      var btn = document.getElementById('saveNotesBtn');
+      var notes = document.getElementById('notesArea').value;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      run('saveAppointmentNotes', [row, notes]).then(function () {
+        btn.textContent = 'Saved';
+        btn.classList.add('saved');
+        toast('Notes saved');
+      }).catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Notes';
+        toast('Could not save notes: ' + (err.message || err), true);
+      });
+    }
+
+    function invalidateListCaches() {
+      cache = { today: null, upcoming: null, recalls: null };
+    }
+
+    return {
+      navigate: navigate,
+      goBack: goBack,
+      openDetail: openDetail,
+      onSearchInput: onSearchInput,
+      setToggle: setToggle,
+      onNotesChange: onNotesChange,
+      saveNotes: saveNotes
+    };
+  })();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    App.navigate('today');
+  });
+  </script>
+
+<? } ?>
+</body>
+</html>
