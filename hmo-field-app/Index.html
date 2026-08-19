@@ -210,6 +210,18 @@
   }
   .method-toggle button.on{background:var(--gold);color:var(--teal-dark);}
 
+  .amounts-row{display:flex;gap:10px;margin-bottom:4px;}
+  .amount-field{flex:1;}
+  .amount-field label{
+    display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;
+    color:var(--teal-mid);opacity:0.75;margin-bottom:4px;
+  }
+  .amount-field input{
+    width:100%;border-radius:8px;border:1px solid var(--cream-warm);background:var(--cream);
+    padding:10px 12px;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--teal-dark);outline:none;
+  }
+  .amount-field input:focus{border-color:var(--teal-accent);}
+
   textarea.notes{
     width:100%;min-height:110px;border-radius:8px;border:1px solid var(--cream-warm);
     background:var(--cream);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--teal-dark);
@@ -561,10 +573,10 @@
         infoCell('Date', fmtDateHeading(r.date) || '&mdash;') +
         infoCell('Time', fmtTime(r.time) || '&mdash;') +
         infoCell('Deposit Paid', r.depositPaid || '&mdash;') +
-        infoCell('Deposit Amount', r.depositAmount ? '&pound;' + esc(r.depositAmount) : '&mdash;') +
-        infoCell('Balance Amount', r.balanceAmount ? '&pound;' + esc(r.balanceAmount) : '&mdash;') +
         infoCell('Total Paid', r.totalPaid ? '&pound;' + esc(r.totalPaid) : '&mdash;', true) +
         '</div>';
+
+      html += amountsSection(r);
 
       html += '<div class="section-title">Update on the spot</div>';
 
@@ -591,6 +603,20 @@
     function infoCell(label, value, gold) {
       return '<div class="info-cell"><div class="label">' + esc(label) + '</div>' +
         '<div class="value' + (gold ? ' gold' : '') + '">' + value + '</div></div>';
+    }
+
+    function amountsSection(r) {
+      var isBoth = String(r.service || '').toLowerCase().indexOf('both') !== -1;
+      var depositVal = r.depositAmount !== '' ? r.depositAmount : (isBoth ? '20' : '');
+      var balanceVal = r.balanceAmount !== '' ? r.balanceAmount : (isBoth ? '40' : '');
+      return '<div class="section-title">Payment Amounts</div>' +
+        '<div class="amounts-row">' +
+          '<div class="amount-field"><label>Deposit (&pound;)</label>' +
+            '<input type="number" step="0.01" inputmode="decimal" id="depositAmountInput" value="' + esc(depositVal) + '" oninput="App.onAmountsChange()"></div>' +
+          '<div class="amount-field"><label>Balance (&pound;)</label>' +
+            '<input type="number" step="0.01" inputmode="decimal" id="balanceAmountInput" value="' + esc(balanceVal) + '" oninput="App.onAmountsChange()"></div>' +
+        '</div>' +
+        '<button class="btn-gold" id="saveAmountsBtn" disabled onclick="App.saveAmounts(' + r.row + ')">Save Amounts</button>';
     }
 
     function toggleRow(label, field, value) {
@@ -651,6 +677,31 @@
       cache = { today: null, upcoming: null, recalls: null };
     }
 
+    function onAmountsChange() {
+      var btn = document.getElementById('saveAmountsBtn');
+      btn.disabled = false;
+      btn.classList.remove('saved');
+      btn.textContent = 'Save Amounts';
+    }
+
+    function saveAmounts(row) {
+      var btn = document.getElementById('saveAmountsBtn');
+      var deposit = document.getElementById('depositAmountInput').value;
+      var balance = document.getElementById('balanceAmountInput').value;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      run('saveAmounts', [row, deposit, balance]).then(function () {
+        btn.textContent = 'Saved';
+        btn.classList.add('saved');
+        toast('Amounts saved');
+        invalidateListCaches();
+      }).catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Amounts';
+        toast('Could not save amounts: ' + (err.message || err), true);
+      });
+    }
+
     return {
       navigate: navigate,
       goBack: goBack,
@@ -658,7 +709,9 @@
       onSearchInput: onSearchInput,
       setToggle: setToggle,
       onNotesChange: onNotesChange,
-      saveNotes: saveNotes
+      saveNotes: saveNotes,
+      onAmountsChange: onAmountsChange,
+      saveAmounts: saveAmounts
     };
   })();
 

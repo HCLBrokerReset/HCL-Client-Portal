@@ -258,7 +258,7 @@ function searchClients(query) {
   var qDigits = q.replace(/\D/g, '');
 
   var results = getAllRecords_().filter(function (r) {
-    var haystack = (r.firstName + ' ' + r.lastName + ' ' + r.phone + ' ' + r.postcode).toLowerCase();
+    var haystack = (r.firstName + ' ' + r.lastName + ' ' + r.phone + ' ' + r.postcode + ' ' + r.address).toLowerCase();
     if (haystack.indexOf(q) !== -1) return true;
     if (qDigits) {
       var phoneDigits = String(r.phone).replace(/\D/g, '');
@@ -303,6 +303,24 @@ function updateField(row, fieldKey, value) {
     lock.releaseLock();
   }
   return getClientByRow(row);
+}
+
+function saveAmounts(row, depositAmount, balanceAmount) {
+  checkAuthorized_();
+  row = Number(row);
+  var sheet = getSheet_();
+  if (!row || row < 2 || row > sheet.getLastRow()) {
+    throw new Error('Client record not found.');
+  }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    sheet.getRange(row, COL.DEPOSIT_AMOUNT).setValue(depositAmount);
+    sheet.getRange(row, COL.BALANCE_AMOUNT).setValue(balanceAmount);
+  } finally {
+    lock.releaseLock();
+  }
+  return true;
 }
 
 function saveAppointmentNotes(row, notes) {
