@@ -363,6 +363,11 @@
       return 'tel:' + String(phone || '').replace(/\s+/g, '');
     }
 
+    function displayName(r) {
+      var name = (esc(r.firstName) + ' ' + esc(r.lastName)).trim();
+      return name || esc(r.phone) || '(no name on booking)';
+    }
+
     function cardHtml(r, opts) {
       opts = opts || {};
       var metaBits = [];
@@ -375,7 +380,7 @@
       return '' +
         '<div class="client-card" onclick="App.openDetail(' + r.row + ')">' +
           '<div class="card-main">' +
-            '<div class="card-name">' + esc(r.firstName) + ' ' + esc(r.lastName) + '</div>' +
+            '<div class="card-name">' + displayName(r) + '</div>' +
             '<div class="card-meta">' + metaBits.join('') + '</div>' +
           '</div>' +
           '<div class="card-actions">' +
@@ -532,7 +537,7 @@
       var html = '';
 
       html += '<div class="detail-hero">' +
-        '<div class="name">' + esc(r.firstName) + ' ' + esc(r.lastName) + '</div>' +
+        '<div class="name">' + displayName(r) + '</div>' +
         '<div class="sub">' + esc(r.service || '') + (r.earsTreated ? ' &middot; ' + esc(r.earsTreated) : '') + '</div>';
 
       if (r.phone) {

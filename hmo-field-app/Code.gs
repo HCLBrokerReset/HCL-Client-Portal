@@ -200,11 +200,10 @@ function getAllRecords_() {
   var records = [];
   for (var i = 0; i < values.length; i++) {
     var row = values[i];
-    var firstName = row[COL.FIRST_NAME - 1];
-    var lastName = row[COL.LAST_NAME - 1];
-    if ((!firstName || String(firstName).trim() === '') && (!lastName || String(lastName).trim() === '')) {
-      continue; // skip blank trailing rows
-    }
+    var isBlankRow = row.every(function (cell) {
+      return cell === '' || cell === null || cell === undefined;
+    });
+    if (isBlankRow) continue; // skip genuinely empty trailing rows
     records.push(rowToRecord_(row, i + 2));
   }
   return records;
