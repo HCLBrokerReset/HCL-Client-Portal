@@ -1,3 +1,7 @@
+> This repo also contains a second, unrelated project: **[HMO Field App](hmo-field-app/)**,
+> a Google Apps Script PWA for Hear Me Out Ear Care. See `hmo-field-app/DEPLOYMENT.md`
+> for its setup — it doesn't use this repo's GitHub Pages deployment below.
+
 # Hola Herron 🇪🇸 — Spanish for Barry & Sarah
 
 A simple, friendly app for learning to **speak** Spanish together on the couch.

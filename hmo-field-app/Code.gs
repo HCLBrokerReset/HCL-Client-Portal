@@ -54,8 +54,7 @@ var TOTAL_COLUMNS = 29;
 var EDITABLE_FIELDS = {
   balancePaid: COL.BALANCE_PAID,
   waxFound: COL.WAX_FOUND,
-  paymentMethod: COL.PAYMENT_METHOD,
-  depositPaid: COL.DEPOSIT_PAID
+  paymentMethod: COL.PAYMENT_METHOD
 };
 
 // ====================== WEB APP ENTRY POINT ======================
