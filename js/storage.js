@@ -55,7 +55,14 @@ const Store = (() => {
   }
 
   // ---- dates -------------------------------------------------------------
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  // Local calendar date (not UTC) — a "day" for streaks/reviews should match
+  // the device's own day, not flip early/late around midnight in BST etc.
+  const todayStr = () => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  };
   function addDays(dateStr, n) {
     const d = new Date(dateStr + "T00:00:00");
     d.setDate(d.getDate() + n);

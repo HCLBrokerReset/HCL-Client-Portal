@@ -386,12 +386,15 @@
       const mic = node.querySelector("#mic");
       if (mic) {
         mic.addEventListener("click", async () => {
+          if (mic.disabled) return; // guard against double-tap starting two overlapping listens
+          mic.disabled = true;
           fb.innerHTML = "";
           mic.classList.add("listening");
           mic.textContent = "● Listening…";
           const res = await Speech.listenOnce({ onStart: () => {} });
           mic.classList.remove("listening");
           mic.textContent = "🎤 Try again";
+          mic.disabled = false;
 
           if (!res || res.error || !res.best) {
             fb.innerHTML = `<span class="retry">Didn't catch that — check the mic permission and try again, or
