@@ -68,7 +68,7 @@ header.site-header{
 .cat-strip{
   position:sticky; top:var(--header-h, 80px); z-index:190;
   background:var(--navy-dark);
-  display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px;
+  display:flex; flex-wrap:wrap; justify-content:center; gap:10px 12px; padding:12px 16px;
   border-bottom:1px solid #17263c;
 }
 .cat-btn{
@@ -695,7 +695,7 @@ function pctOff(was, now){
   return Math.round((1 - n/w) * 100);
 }
 
-track.innerHTML = CAROUSEL_DATA.map(s => {
+function buildSlideHtml(s){
   const photo = CAROUSEL_PHOTOS[s.icon];
   const media = photo
     ? `<img src="data:image/png;base64,${photo}" alt="${escapeHtml(s.name)}">`
@@ -722,7 +722,15 @@ track.innerHTML = CAROUSEL_DATA.map(s => {
       <div class="slide-photo">${media}</div>
     </div>
   </div>`;
-}).join('');
+}
+
+// Seamless infinite loop: a clone of the last slide is prepended and a clone of the
+// first slide is appended, so the track can keep sliding in the same direction across
+// the wrap point; once that clone's transition finishes we silently (no transition)
+// snap back to the matching real slide, which looks identical to the viewer.
+const REAL_COUNT = CAROUSEL_DATA.length;
+const extended = [CAROUSEL_DATA[REAL_COUNT - 1], ...CAROUSEL_DATA, CAROUSEL_DATA[0]];
+track.innerHTML = extended.map(buildSlideHtml).join('');
 dotsWrap.innerHTML = CAROUSEL_DATA.map((_,i) => `<span data-dot="${i}"></span>`).join('');
 
 track.querySelectorAll('[data-slide-add]').forEach(btn=>{
@@ -735,17 +743,44 @@ track.querySelectorAll('[data-slide-add]').forEach(btn=>{
   });
 });
 
-let slideIndex = 0;
-function goToSlide(i){
-  slideIndex = ((i % CAROUSEL_DATA.length) + CAROUSEL_DATA.length) % CAROUSEL_DATA.length;
-  track.style.transform = `translateX(-${slideIndex * 100}%)`;
+let trackPos = 1;   // position within the extended (cloned) track
+let slideIndex = 0; // logical slide 0..REAL_COUNT-1, for the dots
+
+function updateDots(){
   dotsWrap.querySelectorAll('span').forEach((d,idx)=> d.classList.toggle('active', idx === slideIndex));
 }
-goToSlide(0);
-let carTimer = setInterval(()=> goToSlide(slideIndex + 1), 4500);
-function resetCarTimer(){ clearInterval(carTimer); carTimer = setInterval(()=> goToSlide(slideIndex + 1), 4500); }
-document.getElementById('carPrev').addEventListener('click', ()=>{ goToSlide(slideIndex - 1); resetCarTimer(); });
-document.getElementById('carNext').addEventListener('click', ()=>{ goToSlide(slideIndex + 1); resetCarTimer(); });
+function setTrackPos(pos, animate){
+  trackPos = pos;
+  track.style.transition = animate ? '' : 'none';
+  track.style.transform = `translateX(-${trackPos * 100}%)`;
+  if(!animate){
+    void track.offsetHeight; // force reflow so the next move re-enables the transition cleanly
+    track.style.transition = '';
+  }
+}
+track.addEventListener('transitionend', (e)=>{
+  if(e.propertyName !== 'transform') return;
+  if(trackPos === REAL_COUNT + 1){ setTrackPos(1, false); }
+  else if(trackPos === 0){ setTrackPos(REAL_COUNT, false); }
+});
+
+function goToSlide(i){
+  slideIndex = ((i % REAL_COUNT) + REAL_COUNT) % REAL_COUNT;
+  updateDots();
+  setTrackPos(slideIndex + 1, true);
+}
+function step(delta){
+  trackPos += delta;
+  slideIndex = ((trackPos - 1) % REAL_COUNT + REAL_COUNT) % REAL_COUNT;
+  updateDots();
+  setTrackPos(trackPos, true);
+}
+setTrackPos(1, false);
+updateDots();
+let carTimer = setInterval(()=> step(1), 4500);
+function resetCarTimer(){ clearInterval(carTimer); carTimer = setInterval(()=> step(1), 4500); }
+document.getElementById('carPrev').addEventListener('click', ()=>{ step(-1); resetCarTimer(); });
+document.getElementById('carNext').addEventListener('click', ()=>{ step(1); resetCarTimer(); });
 
 /* ---------- price busters ---------- */
 function addPbItemToCart(idx){
