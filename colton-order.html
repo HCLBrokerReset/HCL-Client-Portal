@@ -92,7 +92,7 @@ mark{background:var(--gold-light); color:var(--navy-dark); padding:0 2px; border
 .carousel-track{display:flex; height:100%; transition:transform .6s cubic-bezier(.4,0,.2,1);}
 .slide{
   flex:0 0 100%; height:100%; position:relative;
-  display:flex; align-items:center; justify-content:space-between; gap:24px;
+  display:flex; align-items:center; justify-content:center; gap:56px;
   padding:0 56px;
 }
 .slide-icon{flex:0 0 auto; width:220px; height:220px; opacity:.95;}
@@ -159,12 +159,8 @@ mark{background:var(--gold-light); color:var(--navy-dark); padding:0 2px; border
 table.product-table{width:100%; border-collapse:collapse; font-size:13.5px;}
 table.product-table thead th{
   background:var(--navy); color:#fff; text-align:left; padding:11px 14px; font-size:11.5px; text-transform:uppercase;
-  letter-spacing:.5px; z-index:5;
+  letter-spacing:.5px;
 }
-/* Sticky column headers only make sense for the long category tables (hundreds of
-   rows) - the short search-results table keeps a plain header, otherwise a sticky
-   header on a tiny table detaches from its one or two data rows and overlaps them. */
-.cat-panel table.product-table thead th{ position:sticky; top:var(--sticky-total, 141px); }
 table.product-table tbody tr{border-bottom:1px solid #eef1f5;}
 table.product-table tbody tr:hover{background:#f7f9fc;}
 table.product-table td{padding:9px 14px; vertical-align:middle; color:var(--navy-dark);}
@@ -232,6 +228,15 @@ table.product-table td.price{font-weight:700; color:var(--navy); white-space:now
   .print-only .p-totals .grand{font-weight:800; font-size:16px; border-top:2px solid #000; padding-top:6px; margin-top:4px;}
 }
 
+/* ---------- NOTICE TOAST ---------- */
+.notice{
+  position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-16px); z-index:400;
+  background:var(--navy-dark); color:#fff; border:1px solid var(--gold); border-radius:10px;
+  padding:14px 20px; font-size:14px; font-weight:600; max-width:min(520px,90vw); text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+}
+.notice.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
 /* ---------- MISC ---------- */
 .footer-note{max-width:1400px; margin:0 auto; padding:10px 24px 40px; color:#8a97a8; font-size:12px; text-align:center;}
 @media (max-width:980px){
@@ -244,6 +249,8 @@ table.product-table td.price{font-weight:700; color:var(--navy); white-space:now
 </style>
 </head>
 <body>
+
+<div class="notice" id="notice"></div>
 
 <header class="site-header">
   <div class="brand">
@@ -343,6 +350,17 @@ const CAROUSEL_PHOTOS = {"anglebead":"iVBORw0KGgoAAAANSUhEUgAAAQEAAAEBCAIAAAD3jo
 const CATS = [{"id":"building","emoji":"\ud83c\udfd7\ufe0f","label":"Building & Aggregates"},{"id":"plumbing","emoji":"\ud83d\udd27","label":"Plumbing & Heating"},{"id":"electrical","emoji":"\u26a1","label":"Electrical"},{"id":"garden","emoji":"\ud83c\udf3f","label":"Garden & Outdoor"},{"id":"household","emoji":"\ud83e\udea3","label":"Household & Cleaning"},{"id":"fixings","emoji":"\ud83d\udd29","label":"Fixings & Fasteners"},{"id":"sealants","emoji":"\ud83d\udee1\ufe0f","label":"Sealants & Adhesives"},{"id":"roofing","emoji":"\ud83e\ude9f","label":"Roofing & Insulation"},{"id":"paints","emoji":"\ud83c\udfa8","label":"Paints & Decorating"},{"id":"tools","emoji":"\ud83d\udd28","label":"Tools & Equipment"},{"id":"hardware","emoji":"\ud83e\uddf0","label":"General Hardware"}];
 
 /* ---------- helpers ---------- */
+let noticeTimer = null;
+function showNotice(msg, duration){
+  const el = document.getElementById('notice');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(()=> el.classList.remove('show'), duration || 6000);
+}
+function isEmbeddedInFrame(){
+  try{ return window.top !== window.self; }catch(e){ return true; }
+}
 function money(n){ return '£' + n.toFixed(2); }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -712,7 +730,11 @@ pbGrid.querySelectorAll('[data-pb-add]').forEach(btn=>{
 /* ---------- email order ---------- */
 document.getElementById('emailBtn').addEventListener('click', ()=>{
   const items = Object.values(cart);
-  if(items.length === 0){ alert('Your basket is empty — add some products before emailing an order.'); return; }
+  if(items.length === 0){ showNotice('Your basket is empty — add some products before emailing an order.'); return; }
+  if(isEmbeddedInFrame()){
+    showNotice('This embedded preview blocks opening your email app. Open this page in its own browser tab (or the deployed site) and Send Order by Email will work normally.', 8000);
+    return;
+  }
   const subtotal = cartTotal();
   const vat = subtotal * 0.2;
   const total = subtotal + vat;
@@ -759,20 +781,17 @@ function buildPrintHtml(items, subtotal, vat, total){
   </body></html>`;
 }
 
-function isEmbeddedInFrame(){
-  try{ return window.top !== window.self; }catch(e){ return true; }
-}
-
 document.getElementById('printBtn').addEventListener('click', ()=>{
   const items = Object.values(cart);
-  if(items.length === 0){ alert('Your basket is empty — add some products before printing an order.'); return; }
+  if(items.length === 0){ showNotice('Your basket is empty — add some products before printing an order.'); return; }
 
   if(isEmbeddedInFrame()){
     // Browsers block popups and print() from inside an embedded/sandboxed preview frame
-    // (e.g. a Claude Artifact preview) - no in-page JS trick can get around that. Tell the
-    // user plainly instead of failing silently; this works fine once the page is opened on
-    // its own (its real URL, or the deployed Netlify site).
-    alert('Printing is blocked inside this embedded preview by the browser (pop-ups and print() are disabled for embedded pages). Open this page directly in its own browser tab - or the deployed site - and Print Order will work normally.');
+    // (e.g. a Claude Artifact preview) - no in-page JS trick can get around that, and even
+    // alert() can be suppressed in that sandbox, so this uses the in-page notice banner
+    // instead. Works fine once the page is opened on its own (its real URL, or the
+    // deployed Netlify site).
+    showNotice('Printing is blocked inside this embedded preview by the browser itself (pop-ups and print() are disabled here). Open this page in its own browser tab - or the deployed site - and Print Order will work normally.', 9000);
     return;
   }
 
@@ -805,7 +824,7 @@ document.getElementById('printBtn').addEventListener('click', ()=>{
     document.getElementById('pSubtotal').textContent = money(subtotal);
     document.getElementById('pVat').textContent = money(vat);
     document.getElementById('pTotal').textContent = money(total);
-    try{ window.print(); }catch(e){ alert('Printing is blocked by this browser. Open the deployed site directly (not inside another page) to print.'); }
+    try{ window.print(); }catch(e){ showNotice('Printing is blocked by this browser. Open the deployed site directly (not inside another page) to print.', 9000); }
   }
 });
 
